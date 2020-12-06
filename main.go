@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/bokwoon95/weblog/pagemanager"
+	"github.com/bokwoon95/weblog/weblog"
 )
 
 const port = ":80"
@@ -16,9 +17,16 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	err = server.AddPlugins(weblog.New("blog"))
+	if err != nil {
+		log.Fatalln(err)
+	}
 	server.Router.Get("/pm-admin", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Welcome to the pagemanager dashboard")
 	})
+	defer func() { // only works for sqlite3
+		_, _ = server.DB.Exec("PRAGMA optimize")
+	}()
 	fmt.Println("Listening on localhost" + port)
-	http.ListenAndServe(port, server)
+	log.Fatal(http.ListenAndServe(port, server))
 }
