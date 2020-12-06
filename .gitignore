@@ -1,0 +1,27 @@
+# General
+**/*.env
+tmp/
+.tmp/
+**/*.sqlite3
+
+# IntelliJ
+.idea/
+
+# JavaScript
+**/node_modules/
+
+# compiled binaries
+/weblog*
+
+# macOS
+.DS_STORE
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent

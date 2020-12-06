@@ -1,0 +1,4 @@
+== Bootstrapping capabilities of PageManager applications ==
+- An end goal would be for the application to look into the database, pull out a list of plugins required for the application to run, `go get` those plugins, insert the necessary config changes in the source code, recompile the binary and then kill itself. This prompts the user to restart the application and on the next run the user will run the newly compiled binary with all the plugins installed.
+- This essentially allows people provide their personal sqlite3 database file, run it with an unintitialized PageManager application and have it bootstrap itself from scratch to reconstruct the user's own website.
+
