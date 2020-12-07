@@ -1,0 +1,135 @@
+Achieving sorting via URL Year/Month/Day grouping is incredibly niche, as a dedicated page with full text search and date ranges is going to be better in every case. Might as well leave your URLs evergreen.
+
+post searching
+skip links
+sitemaps
+RSS feeds
+translations?
+categories? tags?
+    even if no categories or tags, I still want some way for the user to bundle their posts into discrete groups.
+    the good thing about groups is, you can actually organize posts in entirely arbitrary ways. Like, creating a group for C++ or Java or Python or Qt tutorials like zetcode does.
+robots.txt? robots meta tags? (ahrefs has post on it)
+canonical links?
+I need some way to exclude links to dynamic pages when generating a static copy.
+
+http://rachelbythebay.com/w/
+----------------------------
+index header:
+    - blog byline
+    - rss feed
+index footer:
+    - main site
+    - contact me
+index pagination: all in one page
+index entry format:
+    - date(Weekday, Month Day, Year)
+    - title
+post URL format: Year/Month/Day/Title
+post header: index header
+post footer:
+    - index
+    - contact me
+post dating: Weekday, Month Day, Year
+Year/Month/Day access: No
+
+https://travisdowns.github.io/
+------------------------------
+index header:
+    - blog title (linked)
+    - about blog
+index footer:
+    - rss feed
+    - blog title (small)
+    - name
+    - mailto:
+    - github handle
+    - twitter handle
+    - blog byline
+index pagination: all in one page
+index entry format:
+    - date(Month Day, Year)
+    - title
+    - summary
+post header:
+    - index header
+    - date(Month Day, Year)
+post footer:
+    - comments (comments have permalinks)
+    - comment form (guarded by reCAPTCHA)
+    - index footer
+Year/Month/Day access: No
+
+https://www.positech.co.uk/cliffsblog/
+--------------------------------------
+index header:
+    - blog title (linked)
+    - blog byline
+    - about me
+sidebar:
+    - wp login
+    - rss feed
+    - site search
+    - list of games made by him
+    - list of categories
+    - list of Month Year archives
+index footer:
+    - copyright blabla all rights reserved
+    - blog title (small, linked)
+index pagination: back; first3; current(3); last3; next
+index entry format:
+    - title
+    - entire post
+    - (no date)
+post header:
+    - index header
+    - date(Month Day, Year) (clickable)
+    - posted by
+post sidebar: index sidebar
+post footer:
+    - category
+    - tags
+    - prev post, next post
+    - comments (comments have permalinks)
+    - index footer
+post dating: date(Month Day, Year)
+Year/Month/Day access: Yes
+
+https://drewdevault.com/
+https://lemire.me/blog/
+https://nfrechette.github.io/
+https://www.depesz.com/
+https://charity.wtf
+http://www.craigkerstiens.com/
+
+YearMonthDay/Title
+https://preshing.com/
+
+Year/Month/Title
+----------------
+https://theblogtrottergirl.com/
+https://stevelosh.com/blog/
+http://www.oilshell.org/blog/
+https://chrishardie.com/2016/12/joel-on-wordpress/
+
+Year/Title
+----------
+https://eli.thegreenplace.net/
+
+Title
+-----
+https://www.eyeswift.com/
+https://wordsandbuttons.online/
+https://akoutmos.com/
+https://joshwcomeau.com (with arbitrary categories)
+https://susam.in/
+http://danluu.com/
+https://tonsky.me/
+https://www.codevscolor.com/
+https://brandur.org/articles
+https://www.dampfkraft.com/ (with arbitrary categories)
+https://codahale.com/
+
+?p=page_id
+----------
+http://glennengstrand.info/blog/
+https://devblogs.microsoft.com/oldnewthing/
