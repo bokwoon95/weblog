@@ -11,6 +11,7 @@ categories? tags?
 robots.txt? robots meta tags? (ahrefs has post on it)
 canonical links?
 I need some way to exclude links to dynamic pages when generating a static copy.
+how many entire posts per pagination?
 
 http://rachelbythebay.com/w/
 ----------------------------
@@ -25,11 +26,12 @@ index entry format:
     - date(Weekday, Month Day, Year)
     - title
 post URL format: Year/Month/Day/Title
-post header: index header
+post header:
+    - index header
+    - date(Weekday, Month Day, Year)
 post footer:
     - index
     - contact me
-post dating: Weekday, Month Day, Year
 Year/Month/Day access: No
 
 https://travisdowns.github.io/
@@ -50,6 +52,7 @@ index entry format:
     - date(Month Day, Year)
     - title
     - summary
+post URL format: Year/Month/Day/Title
 post header:
     - index header
     - date(Month Day, Year)
@@ -75,11 +78,12 @@ sidebar:
 index footer:
     - copyright blabla all rights reserved
     - blog title (small, linked)
-index pagination: back; first3; current(3); last3; next
+index pagination: back; first3; ...; current(3); ...; last3; next
 index entry format:
     - title
     - entire post
     - (no date)
+post URL format: Year/Month/Day/Title
 post header:
     - index header
     - date(Month Day, Year) (clickable)
@@ -91,11 +95,79 @@ post footer:
     - prev post, next post
     - comments (comments have permalinks)
     - index footer
-post dating: date(Month Day, Year)
 Year/Month/Day access: Yes
 
 https://drewdevault.com/
+------------------------
+index header:
+    - Blog title
+sidebar:
+    - profile picture
+    - rss
+    - misc.html
+    - gemini link
+    - mailto:
+    - sourcehut handle
+    - peertube handle
+    - pgp key
+    - donate
+index footer: none
+index pagination: all in one page
+index entry format:
+    - date(Month Day, Year)
+    - title
+post URL format: Year/Month/Day/Title
+post header:
+    - title
+    - date(Month Day, Year)
+    - link back to index
+post footer:
+    - 'Articles from blogs I read'
+        - openring generated feed
+    - CC-BY-SA license
+    - source code link (MIT license)
+Year/Month/Day access: No
+
 https://lemire.me/blog/
+-----------------------
+index header: none
+sidebar:
+    - (sidebar is very long and scrolls with the main page, unlike with Joel on Software's blog)
+    - blog title
+    - about me summary
+    - homepage link, papers link, github link
+    - subscribe by email
+    - follow on twitter
+    - follow on github
+    - google scholar references
+    - facebook handle
+    - linkedin handle
+    - links to his other stuff
+    - search bar
+    - support my work paragraph
+    - recent posts
+    - recent comments
+    - moar links to pages
+    - Archives (Month Year), contains count
+    - login/rss/wordpress.org
+index footer: powered by wordpress 🙄
+index pagination: - back; first; ...; current3; ...; last; next;
+index entry format: multiple options
+    - title, date, summary
+    - title, date, post
+post URL format: Year/Month/Day/Title
+post header:
+    - title
+post footer:
+    - comments (permalinked)
+    - comment form
+        - rich text editor
+        - receive email notifications
+            - to my comments/to all comments
+            - instantly/hourly/daily/weekly
+    - prev post, next post
+Year/Month/Day access: Yes
+
 https://nfrechette.github.io/
 https://www.depesz.com/
 https://charity.wtf
@@ -133,3 +205,32 @@ https://codahale.com/
 ----------
 http://glennengstrand.info/blog/
 https://devblogs.microsoft.com/oldnewthing/
+
+
+== My Design ==
+trinkets that can (currently) shove it:
+    - about me (up to pagemanager to handle)
+    - social media handles (vain mfs)
+    - rss/sitemap (not yet)
+    - search link (very powerful FTS, needs some work)
+index header:
+    - blog title (linked)
+    - blog byline (optional)
+index footer: none
+index pagination: multiple options
+    - all in one page
+    - back; first; ...; current3; ...; last; next;
+    - how many posts per page? user-configured.
+index entry format: multiple options
+    - title, date, summary
+    - title, date, entire post
+post URL format: multiple options
+    - Year-Month-Day/Slug
+    - Year/Month/Day/Slug
+    - Year/Month/Slug
+    - Year-Month/Slug
+    - Slug
+    - etc.
+post header:
+    - title
+    - date
