@@ -221,6 +221,14 @@ func (main *Templates) Render(w http.ResponseWriter, r *http.Request, data map[s
 	main.cache[fullname] = cacheEntry
 	err = executeTemplate(cacheEntry, w, main.bufpool, name, data)
 	if err != nil {
+		// TODO: if error is related to non-existent template, attempt to find
+		// the file associated with `name`.  If it exists, do an ad-hoc
+		// .Parse(), add in the common templates and .Execute() it. Do not
+		// cache the result, as this is the only way we can have dynamic
+		// user-defined templates with recompilation. Very valuable when
+		// hosting on some server, the user can tweak templates dynamically.
+		// Or should this be handled by the caller instead? They can always
+		// catch the error thrown from Render() and manage it on their end.
 		return err
 	}
 	return nil

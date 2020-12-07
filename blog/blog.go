@@ -2,20 +2,25 @@ package blog
 
 import "github.com/bokwoon95/weblog/pagemanager"
 
-type Server struct {
-	*pagemanager.Server
+type Blog struct {
+	*pagemanager.PageManager
 	namespace string
 }
 
-func New(namespace string) func(*pagemanager.Server) pagemanager.Plugin {
-	return func(server *pagemanager.Server) pagemanager.Plugin {
-		return &Server{
-			Server: server,
+func New(namespace string) func(*pagemanager.PageManager) pagemanager.Plugin {
+	return func(server *pagemanager.PageManager) pagemanager.Plugin {
+		return &Blog{
+			PageManager: server,
 		}
 	}
 }
 
-func (srv *Server) AddRoutes() error {
+// dumps a form out for pagemanager to show to the user; must be completed before the rest of the routes can be set up.
+func (srv *Blog) Config() error {
+	return nil
+}
+
+func (srv *Blog) AddRoutes() error {
 	// ensureTables()
 	return nil
 }
