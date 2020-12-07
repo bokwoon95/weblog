@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/bokwoon95/weblog/blog"
 	"github.com/bokwoon95/weblog/pagemanager"
-	"github.com/bokwoon95/weblog/weblog"
 )
 
 const port = ":80"
@@ -17,7 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	err = server.AddPlugins(weblog.New("blog"))
+	err = server.AddPlugins(blog.New("blog"))
 	if err != nil {
 		log.Fatalln(err)
 	}

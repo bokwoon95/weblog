@@ -16,7 +16,8 @@ CREATE TABLE pm_routes (
     ,handler_url TEXT
 );
 
--- weblog
+-- blog
+-- TODO: how to design blog tables such that it can accomodate arbitrary URL hierarchies?
 CREATE TABLE wb_posts (
     post_id BIGINT NOT NULL PRIMARY KEY
     ,slug TEXT
