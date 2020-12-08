@@ -21,9 +21,13 @@ CREATE TABLE pm_users (
 );
 
 CREATE TABLE pm_templates (
-    name TEXT NOT NULL PRIMARY KEY
-    ,body TEXT
-    ,data_format TEXT
+    template_id BIGINT NOT NULL PRIMARY KEY
+    ,plugin TEXT
+    ,name TEXT
+    ,template_name TEXT
+    ,template_body TEXT
+    ,template_format TEXT
+    ,template_gob BYTEA
 );
 
 CREATE TABLE pm_routes (
@@ -41,7 +45,7 @@ CREATE TABLE blg_config (
     ,pagination_format TEXT
     ,posts_per_page INT
     ,date_format TEXT
-    ,index_entry_format TEXT
+    ,index_post_format TEXT
     ,url_format TEXT
 );
 

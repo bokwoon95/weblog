@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <title></title>
+</head>
+<body>
+  {{ template "bokwoon95/simplewhite header" . }}
+  <div class="posts-list">
+    {{ range $i, $post := $.posts }}
+      {{ template "bokwoon95/simplewhite index_post" mapadd $ "post" $post }}
+    {{ end }}
+    {{ template "bokwoon95/simplewhite pagination" . }}
+  </div>
+</body>
+</html>

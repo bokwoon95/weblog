@@ -1,0 +1,9 @@
+{{ define "bokwoon95/simplewhite index_post" }}
+<div>
+  <p>Title: {{ $.post.Title }}</p>
+  <p>Date: {{ $.post.Date }}</p>
+  {{ if $.post.Summary }}
+    <p>Summary: {{ $.post.Summary }}</p>
+  {{ end }}
+</div>
+{{ end }}
