@@ -1,0 +1,9 @@
+- How to insert a persistent floating sidebar using javascript?
+    - How to toggle it between hidden and shown?
+- How to style contenteditable elements such that they are clearly editable even when not focused?
+- How to make persist changes to contenteditable elements to the database, and how to then retrieve it?
+- What does the API for user-editable fields look like to the template creator?
+    - To the blog user, we need to display a conteneditable field
+    - To the blog reader, we need to display the text that the blog user registered.
+    - In both cases the HTML is entirely the same, except for those elements. Metatemplating?
+- I'm guessing I don't need to explicitly show which fields are global and which fields are local to the page. Maybe I could color them differently. When a contenteditable field is coloured as 'global', it signals to the user that whatever changes they are making to this element will also be reflected in all instances of the same element that occur throughout the website. Quite an elegant UI actually.
