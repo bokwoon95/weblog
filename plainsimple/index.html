@@ -22,13 +22,13 @@
   <title></title>
 </head>
 <body>
-  {{ template "bokwoon95/simplewhite header" . }}
+  {{ template "bokwoon95/plainsimple header" . }}
   <div class="posts-list pt4 pb2 ph7">
     {{ range $i, $post := $.posts }}
-      {{ template "bokwoon95/simplewhite index_post" mapadd $ "post" $post }}
+      {{ template "bokwoon95/plainsimple index_post" mapadd $ "post" $post }}
     {{ end }}
-    {{ template "bokwoon95/simplewhite pagination" . }}
+    {{ template "bokwoon95/plainsimple pagination" . }}
   </div>
-  {{ template "bokwoon95/simplewhite footer" . }}
+  {{ template "bokwoon95/plainsimple footer" . }}
 </body>
 </html>
