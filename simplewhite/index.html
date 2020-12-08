@@ -3,16 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css">
-  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    html {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Oxygen, Cantarell, sans-serif;
+    }
+    .hero-banner {
+      width: 100vw;
+      height: 400px;
+      background-image: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(/static/hero.jpg);
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: local;
+    }
+    .text-border {
+      text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black;
+    }
+  </style>
   <title></title>
 </head>
 <body>
   {{ template "bokwoon95/simplewhite header" . }}
-  <div class="posts-list">
+  <div class="posts-list pt4 pb2 ph7">
     {{ range $i, $post := $.posts }}
       {{ template "bokwoon95/simplewhite index_post" mapadd $ "post" $post }}
     {{ end }}
     {{ template "bokwoon95/simplewhite pagination" . }}
   </div>
+  {{ template "bokwoon95/simplewhite footer" . }}
 </body>
 </html>

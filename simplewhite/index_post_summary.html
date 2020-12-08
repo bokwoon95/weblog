@@ -1,9 +1,11 @@
 {{ define "bokwoon95/simplewhite index_post" }}
 <div>
-  <p>Title: {{ $.post.Title }}</p>
-  <p>Date: {{ $.post.Date }}</p>
+  <div class="f6 mt2 gray">{{ $.post.Date.Format "2006 January 02" }}</div>
+  <div class="f3 fw7 lh-title"><a href="">{{ $.post.Title }}</a></div>
   {{ if $.post.Summary }}
-    <p>Summary: {{ $.post.Summary }}</p>
+    <div class="mt3">{{ $.post.Summary }}</div>
   {{ end }}
+  <div class="mt2 mb4"><a href="">read more</a></div>
+  <hr>
 </div>
 {{ end }}

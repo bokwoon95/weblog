@@ -29,29 +29,31 @@ type Post struct {
 	Body    string
 }
 
+var singapore, _ = time.LoadLocation("Asia/Singapore")
+
 var posts = []Post{
 	{
-		Title:   "Title One",
-		Date:    time.Now(),
-		Summary: "the quick brown fox jumped over the lazy dog",
+		Title:   "HASH: a free, online platform for modeling the world",
+		Date:    time.Date(2020, 6, 18, 0, 0, 0, 0, singapore),
+		Summary: "Sometimes simulating complex systems is the best way to understand them.",
 		Body:    lipsum,
 	},
 	{
-		Title:   "Title Two",
-		Date:    time.Now(),
-		Summary: "the quick brown fox jumped over the lazy dog",
+		Title:   "So, how’s that retirement thing going, anyway?",
+		Date:    time.Date(2019, 12, 5, 0, 0, 0, 0, singapore),
+		Summary: "For the last couple of months, Prashanth Chandrasekar has been getting settled in as the new CEO of Stack Overflow. I’m still going on some customer calls…",
 		Body:    lipsum,
 	},
 	{
-		Title:   "Title Three",
-		Date:    time.Now(),
-		Summary: "the quick brown fox jumped over the lazy dog",
+		Title:   "Welcome, Prashanth!",
+		Date:    time.Date(2019, 9, 24, 0, 0, 0, 0, singapore),
+		Summary: "Last March, I shared that we were starting to look for a new CEO for Stack Overflow. We were looking for that rare combination of someone who…",
 		Body:    lipsum,
 	},
 	{
-		Title:   "Title Four",
-		Date:    time.Now(),
-		Summary: "the quick brown fox jumped over the lazy dog",
+		Title:   "The next CEO of Stack Overflow",
+		Date:    time.Date(2019, 3, 28, 0, 0, 0, 0, singapore),
+		Summary: "We’re looking for a new CEO for Stack Overflow. I’m stepping out of the day-to-day and up to the role of Chairman of the Board.",
 		Body:    lipsum,
 	},
 }
@@ -77,9 +79,9 @@ var funcs = map[string]interface{}{
 func main() {
 	var err error
 	common := []string{
-		sourcedir + "/header.html",
+		sourcedir + "/common.html",
 	}
-	if false {
+	if true {
 		common = append(common, sourcedir+"/index_post_summary.html")
 		common = append(common, sourcedir+"/pagination_none.html")
 	} else {
@@ -97,7 +99,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]interface{}{
-			"posts":  posts,
+			"posts": posts,
 		}
 		err := templates.Render(w, r, data, sourcedir+"/index.html")
 		if err != nil {
