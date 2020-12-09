@@ -18,19 +18,10 @@
     .text-border {
       text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black;
     }
-    .toolbar {
-      float: left;
-      width: 50vw;
-      position: fixed;
-      z-index: 1;
-      top: 0;
-      background-color: red;
-    }
   </style>
   <title></title>
 </head>
 <body>
-  <div class="toolbar">Hay there</div>
   {{ template "bokwoon95/plainsimple header" . }}
   <div class="posts-list pt4 pb2 ph7">
     {{ range $i, $post := $.posts }}
@@ -40,55 +31,4 @@
   </div>
   {{ template "bokwoon95/plainsimple footer" . }}
 </body>
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha256-4+XzXVhsDmqanXGHaHvgh1gMQKX40OUvDEBTu8JcmNs=" crossorigin="anonymous"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", function() {
-    var [offsetX, offsetY] = [0, 0];
-    var dragElement = $('.toolbar');
-    var dragging = false;
-    function updatePosition(event) {
-      dragElement.css({
-        left: event.pageX - offsetX ,
-        top: event.pageY - offsetY
-      });
-    }
-    dragElement.on('mousedown', function(event) {
-      dragging = true;
-      offsetX = event.pageX - dragElement.offset().left;
-      offsetY = event.pageY - dragElement.offset().top;
-    });
-    $(window).on('mousemove', function(event) {
-      if(dragging) {
-        updatePosition(event);
-      }
-    });
-    $(window).on('mouseup', function(event) {
-      dragging = false;
-    });
-  });
-  // $(function(){
-  //   var [offsetX, offsetY] = [0, 0];
-  //   var dragElement = $('.toolbar');
-  //   var dragging = false;
-  //   function updatePosition(event) {
-  //     dragElement.css({
-  //       left: event.pageX - offsetX ,
-  //       top: event.pageY - offsetY
-  //     });
-  //   }
-  //   dragElement.on('mousedown', function(event) {
-  //     dragging = true;
-  //     offsetX = event.pageX - dragElement.offset().left;
-  //     offsetY = event.pageY - dragElement.offset().top;
-  //   });
-  //   $(window).on('mousemove', function(event) {
-  //     if(dragging) {
-  //       updatePosition(event);
-  //     }
-  //   });
-  //   $(window).on('mouseup', function(event) {
-  //     dragging = false;
-  //   });
-  // });
-</script>
 </html>
