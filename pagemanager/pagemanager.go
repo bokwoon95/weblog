@@ -9,10 +9,12 @@ import (
 	"net/http"
 	"strconv"
 
+	sq "github.com/bokwoon95/go-structured-query/postgres"
 	"github.com/bokwoon95/weblog/pagemanager/chi"
 	"github.com/bokwoon95/weblog/pagemanager/chi/middleware"
 	"github.com/dgraph-io/ristretto"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 const (
@@ -23,10 +25,11 @@ const (
 )
 
 type PageManager struct {
-	Restart chan struct{}
-	DB      *sql.DB
-	Cache   *ristretto.Cache
-	Router  *chi.Mux
+	Restart    chan struct{}
+	DB         *sql.DB
+	Cache      *ristretto.Cache
+	Router     *chi.Mux
+	HTMLPolicy *bluemonday.Policy
 }
 
 func New(driverName, dataSourceName string) (*PageManager, error) {
@@ -73,6 +76,7 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	pm.Router.Get("/pm-admin", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Welcome to the pagemanager dashboard")
 	})
+	pm.Router.Post("/pm-kv", pm.KVPost)
 	var count int
 	err = pm.DB.QueryRow("SELECT COUNT(*) FROM pm_routes").Scan(&count)
 	if err != nil {
@@ -82,6 +86,9 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 		pm.Restart <- struct{}{}
 		io.WriteString(w, "restarted\nThere are "+strconv.Itoa(count)+" rows in pm_routes")
 	})
+	// HTMLPolicy
+	pm.HTMLPolicy = bluemonday.UGCPolicy()
+	pm.HTMLPolicy.AllowStyling()
 	return pm, nil
 }
 
@@ -203,15 +210,67 @@ type Plugin interface {
 	AddRoutes() error
 }
 
-func (pm *PageManager) AddPlugins(constructors ...func(*PageManager) Plugin) error {
+type PluginConstructor func(*PageManager) (Plugin, error)
+
+func (pm *PageManager) AddPlugins(constructors ...PluginConstructor) error {
 	var err error
 	var plugin Plugin
 	for _, constructor := range constructors {
-		plugin = constructor(pm)
+		plugin, err = constructor(pm)
+		if err != nil {
+			return err
+		}
 		err = plugin.AddRoutes()
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// TODO: howtf to make this a template function accessible to everyone?
+func (pm *PageManager) KVGet(key, value string) error {
+	return nil
+}
+
+type KeyValuePostData struct {
+	KeyValuePairs []struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	} `json:"key_value_pairs"`
+	RedirectTo string `json:"redirect_to"`
+}
+
+func (pm *PageManager) KVPost(w http.ResponseWriter, r *http.Request) {
+	kvdata := KeyValuePostData{}
+	err := decodeJSONBody(w, r, &kvdata)
+	if err != nil {
+		var mr *malformedRequest
+		switch {
+		case errors.As(err, &mr):
+			http.Error(w, mr.msg, mr.status)
+		default:
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	pm_kv := pm_kv()
+	_, err = sq.
+		InsertInto(pm_kv).
+		Valuesx(func(col *sq.Column) {
+			for _, keyValuePair := range kvdata.KeyValuePairs {
+				col.SetString(pm_kv.key, keyValuePair.Key)
+				col.SetString(pm_kv.value, keyValuePair.Value)
+			}
+		}).
+		OnConflict(pm_kv.key).
+		DoUpdateSet(pm_kv.value.Set(sq.Excluded(pm_kv.value))).
+		Exec(pm.DB, 0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	for _, keyValuePair := range kvdata.KeyValuePairs {
+		pm.Cache.Set(keyValuePair.Key, keyValuePair.Value, 0)
+	}
+	http.Redirect(w, r, kvdata.RedirectTo, http.StatusMovedPermanently)
 }

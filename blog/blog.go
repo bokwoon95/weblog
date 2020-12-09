@@ -7,11 +7,11 @@ type Blog struct {
 	namespace string
 }
 
-func New(namespace string) func(*pagemanager.PageManager) pagemanager.Plugin {
-	return func(server *pagemanager.PageManager) pagemanager.Plugin {
+func New(namespace string) func(*pagemanager.PageManager) (pagemanager.Plugin, error) {
+	return func(server *pagemanager.PageManager) (pagemanager.Plugin, error) {
 		return &Blog{
 			PageManager: server,
-		}
+		}, nil
 	}
 }
 

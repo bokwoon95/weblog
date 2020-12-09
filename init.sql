@@ -3,10 +3,6 @@ DROP TRIGGER IF EXISTS blg_posts_after_insert;
 DROP TRIGGER IF EXISTS blg_posts_after_delete;
 DROP TRIGGER IF EXISTS blg_posts_after_update;
 DROP TABLE IF EXISTS blg_users_posts;
-DROP TABLE IF EXISTS blg_posts_fts_config;
-DROP TABLE IF EXISTS blg_posts_fts_data;
-DROP TABLE IF EXISTS blg_posts_fts_docsize;
-DROP TABLE IF EXISTS blg_posts_fts_idx;
 DROP TABLE IF EXISTS blg_posts_fts;
 DROP TABLE IF EXISTS blg_posts;
 DROP TABLE IF EXISTS blg_config;
@@ -14,8 +10,14 @@ DROP TABLE IF EXISTS blg_config;
 DROP TABLE IF EXISTS pm_routes;
 DROP TABLE IF EXISTS pm_templates;
 DROP TABLE IF EXISTS pm_users;
+DROP TABLE IF EXISTS pm_kv;
 
 -- pagemanager
+CREATE TABLE pm_kv (
+    key TEXT NOT NULL PRIMARY KEY
+    ,value TEXT
+);
+
 CREATE TABLE pm_users (
     user_id BIGINT NOT NULL PRIMARY KEY
 );
@@ -26,7 +28,6 @@ CREATE TABLE pm_templates (
     ,name TEXT
     ,template_name TEXT
     ,template_body TEXT
-    ,template_format TEXT
     ,template_gob BYTEA
 );
 

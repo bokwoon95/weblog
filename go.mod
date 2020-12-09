@@ -3,10 +3,13 @@ module github.com/bokwoon95/weblog
 go 1.15
 
 require (
+	github.com/bokwoon95/go-structured-query v1.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/ristretto v0.0.3
+	github.com/golang/gddo v0.0.0-20201207183808-b853219a4332
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/microcosm-cc/bluemonday v1.0.4
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/stretchr/testify v1.6.1 // indirect
