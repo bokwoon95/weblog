@@ -1,5 +1,6 @@
 - How to insert a persistent floating sidebar using javascript?
     - How to toggle it between hidden and shown?
+    - https://www.reddit.com/r/javascript/comments/xv00y/a_draggable_toolbarwithout_jqueryui_draggable/
 - How to style contenteditable elements such that they are clearly editable even when not focused?
 - How to make persist changes to contenteditable elements to the database, and how to then retrieve it?
 - What does the API for user-editable fields look like to the template creator?
