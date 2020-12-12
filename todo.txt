@@ -1,0 +1,22 @@
+- How to make persist changes to contenteditable elements to the database, and how to then retrieve it?
+    - every contenteditable element has an id which is the key. The innerHTML is the value. A javascript function gathers up items tagged with '.conteneditable' into a JSON payload and does a POST request to /pm-kv. On success it simply reloads the current page.
+    - howtf do I sort out the templating issue? How to declare a set of *templat.Templates which is extensible by individual plugins in a way that do not conflict with other plugins? The plugins *need* access to the universal templates and template functions that pagemanager provides.
+- What does the API for user-editable fields look like to the template creator?
+    template creator:
+        {{ h (cond .editMode "h1.contenteditable" "h1") (map "id" "contenteditable:title") (or $title "default text") }}
+    template user:
+        <h1 id="contenteditable:title" class="contenteditable">You've yee-d your last haw</h1>
+    template reader:
+        <h1 id="contenteditable:title">You've <b>yee-d</b> your last haw</h1>
+- If I set a header in a middleware, can middlewares down the chain view what it is and edit it? My use case is being able to inject CSP hashes dynamically based on what which CSS/JS scripts are going to be rendered.
+- How do I compute a valid hash when given a static CSS/JS payload? Can it be computed programatically?
+- Hoooly shit I can walk the parse tree and find all template name invocations, then use that info to include CSS/JS payloads dynamically.
+    - https://stackoverflow.com/questions/40584612/how-to-get-a-map-or-list-of-template-actions-from-a-parsed-template
+    - template plugin authors: they need to provide some structured way of mapping CSS/JS files to each template. Some kind of metadata struct that comes together with the template plugin. Then webtemplate simply walks through the Parse tree and for every template invocation it finds, it checks if there is a corresponding CSS/JS payload associated with that template and adds it to the template's list (all done at startup/Parse() time). Then when that template gets invoked, all the CSS/JS payloads are injected into the map data for the {{ template "bokwoon95/webtemplate:css" . }} and {{ template "bokwoon95/webtemplate:js" . }} to pick up on.
+
+type Template struct {
+    Name string
+    HTML *template.Template
+    CSS  template.CSS
+    JS   template.JS
+}
