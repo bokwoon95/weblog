@@ -13,6 +13,7 @@
 - Hoooly shit I can walk the parse tree and find all template name invocations, then use that info to include CSS/JS payloads dynamically.
     - https://stackoverflow.com/questions/40584612/how-to-get-a-map-or-list-of-template-actions-from-a-parsed-template
     - template plugin authors: they need to provide some structured way of mapping CSS/JS files to each template. Some kind of metadata struct that comes together with the template plugin. Then webtemplate simply walks through the Parse tree and for every template invocation it finds, it checks if there is a corresponding CSS/JS payload associated with that template and adds it to the template's list (all done at startup/Parse() time). Then when that template gets invoked, all the CSS/JS payloads are injected into the map data for the {{ template "bokwoon95/webtemplate:css" . }} and {{ template "bokwoon95/webtemplate:js" . }} to pick up on.
+    - It's not going to be as simple as walking down one template tree, as a template tree can reference other template trees. I'll have to chase down all referenced templates in the associated templates list.
 
 type Template struct {
     Name string

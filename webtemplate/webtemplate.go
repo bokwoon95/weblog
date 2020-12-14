@@ -6,12 +6,23 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/oxtoacart/bpool"
 )
+
+func Directory(skip int) string {
+	_, filename, _, _ := runtime.Caller(1)
+	elems := []string{filepath.Dir(filename)}
+	for i := 0; i < skip; i++ {
+		elems = append(elems, "..")
+	}
+	return filepath.Join(elems...) + string(os.PathSeparator)
+}
 
 type Source struct {
 	// equivalent html/template call:
@@ -30,11 +41,23 @@ type Sources struct {
 	CommonOptions   []string
 }
 
+type CSS struct {
+	URL  string
+	Text template.CSS
+	Hash string
+}
+
+type JS struct {
+	URL  string
+	Text template.JS
+	Hash string
+}
+
 type Template struct {
 	Name string
 	HTML *template.Template
-	CSS  []template.CSS
-	JS   []template.JS
+	CSS  []*CSS
+	JS   []*JS
 }
 
 type Templates struct {
@@ -43,7 +66,7 @@ type Templates struct {
 	lib     map[string]*template.Template // never gets executed, main purpose for cloning
 	cache   map[string]*template.Template // is what gets executed, should not changed after it is set
 	funcs   map[string]interface{}
-	options []string
+	opts    []string
 }
 
 type ParseOption func(*Sources) error
@@ -76,6 +99,7 @@ func Parse(opts ...ParseOption) (*Templates, error) {
 			return ts, err
 		}
 	}
+	ts.opts = srcs.CommonOptions // clone options
 	if len(srcs.CommonFuncs) > 0 {
 		ts.common = ts.common.Funcs(srcs.CommonFuncs)
 	}
@@ -99,6 +123,7 @@ func Parse(opts ...ParseOption) (*Templates, error) {
 		if err != nil {
 			return ts, err
 		}
+		cacheEntry = cacheEntry.Option(srcs.CommonOptions...)
 		err = addParseTree(cacheEntry, tmpl)
 		if err != nil {
 			return ts, err
@@ -122,16 +147,17 @@ func AddParse(base *Templates, opts ...ParseOption) (*Templates, error) {
 	}
 	// Clone base.lib and regenerate base.cache
 	for name, tmpl := range base.lib {
-		clonedTmpl, err := tmpl.Clone()
+		libTmpl, err := tmpl.Clone()
 		if err != nil {
 			return ts, err
 		}
-		ts.lib[name] = clonedTmpl
+		ts.lib[name] = libTmpl
 		cacheEntry, err := ts.common.Clone()
 		if err != nil {
 			return ts, err
 		}
-		err = addParseTree(cacheEntry, tmpl)
+		cacheEntry = cacheEntry.Option(base.opts...) // clone options
+		err = addParseTree(cacheEntry, libTmpl)
 		if err != nil {
 			return ts, err
 		}
@@ -169,6 +195,7 @@ func AddParse(base *Templates, opts ...ParseOption) (*Templates, error) {
 		if err != nil {
 			return ts, err
 		}
+		cacheEntry = cacheEntry.Option(srcs.CommonOptions...)
 		err = addParseTree(cacheEntry, tmpl)
 		if err != nil {
 			return ts, err
@@ -178,16 +205,54 @@ func AddParse(base *Templates, opts ...ParseOption) (*Templates, error) {
 	return ts, nil
 }
 
-func AddFiles(filepatterns ...string) ParseOption {
+func AddCommonFiles(root string, filepatterns ...string) ParseOption {
 	return func(srcs *Sources) error {
 		for _, filepattern := range filepatterns {
-			filenames, err := filepath.Glob(filepattern)
+			filenames, err := filepath.Glob(root + filepattern)
 			if err != nil {
 				return err
 			}
+			if len(filenames) == 0 {
+				return fmt.Errorf("no files matching %s%s", root, filepattern)
+			}
 			for _, filename := range filenames {
+				filename = strings.TrimPrefix(filename, root)
 				src := Source{}
-				b, err := ioutil.ReadFile(filename)
+				b, err := ioutil.ReadFile(root + filename)
+				if err != nil {
+					return err
+				}
+				src.Text = string(b)
+				src.Filepaths = append(src.Filepaths, filename)
+				// check if user already defined a template called `filename` inside the template itself
+				re, err := regexp.Compile(`{{\s*define\s+["` + "`" + `]` + filename + `["` + "`" + `]\s*}}`)
+				if err != nil {
+					return err
+				}
+				if !re.MatchString(string(b)) {
+					src.Name = filename
+				}
+				srcs.CommonTemplates = append(srcs.CommonTemplates, src)
+			}
+		}
+		return nil
+	}
+}
+
+func AddFiles(root string, filepatterns ...string) ParseOption {
+	return func(srcs *Sources) error {
+		for _, filepattern := range filepatterns {
+			filenames, err := filepath.Glob(root + filepattern)
+			if err != nil {
+				return err
+			}
+			if len(filenames) == 0 {
+				return fmt.Errorf("no files matching %s%s", root, filepattern)
+			}
+			for _, filename := range filenames {
+				filename = strings.TrimPrefix(filename, root)
+				src := Source{}
+				b, err := ioutil.ReadFile(root + filename)
 				if err != nil {
 					return err
 				}
@@ -278,7 +343,7 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 	if err != nil {
 		return err
 	}
-	// NOTE: since Clone() does not clone options, should I re-configure .Option() here?
+	cacheEntry = cacheEntry.Option(ts.opts...)
 	for _, nm := range names {
 		tmpl, _ := lookup(ts, nm)
 		if tmpl == nil {

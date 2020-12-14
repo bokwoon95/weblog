@@ -1,6 +1,8 @@
 package main
 
-import "html/template"
+import (
+	"html/template"
+)
 
 // original idea: all templat plugins provide a Funcs(in)out method, templat will group them together at parse time
 
