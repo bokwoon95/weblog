@@ -14,8 +14,9 @@ const side2_js = `window.side2 = "side2";`
 
 func Side2(srcs *webtemplate.Sources) error {
 	src := webtemplate.Source{
-		Name: "",
-		Text: side2_html,
+		Name:       "side2",
+		NameInText: true,
+		Text:       side2_html,
 		CSS: []*webtemplate.CSS{
 			{Text: side2_css},
 		},

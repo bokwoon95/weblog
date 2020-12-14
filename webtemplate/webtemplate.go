@@ -28,11 +28,12 @@ func Directory(skip int) string {
 type Source struct {
 	// equivalent html/template call:
 	// t.New(src.Name).Funcs(src.Funcs).Option(src.Options...).Parse(src.Text)
-	Name      string
-	Filepaths []string
-	Text      string
-	CSS       []*CSS
-	JS        []*JS
+	Name       string
+	NameInText bool
+	Filepaths  []string
+	Text       string
+	CSS        []*CSS
+	JS         []*JS
 	// NOTE: still not sure if template-specific funcs are a good idea. Common funcs should be dumped in srcs.CommonFuncs, all funcs should be global?
 	Funcs   map[string]interface{}
 	Options []string
@@ -43,6 +44,7 @@ type Sources struct {
 	CommonTemplates []Source
 	CommonFuncs     map[string]interface{}
 	CommonOptions   []string
+	DataFuncs       []func(http.ResponseWriter, *http.Request, map[string]interface{})
 }
 
 type CSS struct {
@@ -58,14 +60,15 @@ type JS struct {
 }
 
 type Templates struct {
-	bufpool *bpool.BufferPool
-	common  *template.Template            // gets included in every template in the cache
-	lib     map[string]*template.Template // never gets executed, main purpose for cloning
-	cache   map[string]*template.Template // is what gets executed, should not changed after it is set
-	css     map[string][]*CSS
-	js      map[string][]*JS
-	funcs   map[string]interface{}
-	opts    []string
+	bufpool   *bpool.BufferPool
+	common    *template.Template            // gets included in every template in the cache
+	lib       map[string]*template.Template // never gets executed, main purpose for cloning
+	cache     map[string]*template.Template // is what gets executed, should not changed after it is set
+	css       map[string][]*CSS
+	js        map[string][]*JS
+	funcs     map[string]interface{}
+	opts      []string
+	datafuncs []func(http.ResponseWriter, *http.Request, map[string]interface{})
 }
 
 type OptionParse func(*Sources) error
@@ -101,6 +104,7 @@ func Parse(opts ...OptionParse) (*Templates, error) {
 		}
 	}
 	ts.opts = srcs.CommonOptions // clone options
+	ts.datafuncs = srcs.DataFuncs
 	if len(srcs.CommonFuncs) > 0 {
 		ts.common = ts.common.Funcs(srcs.CommonFuncs)
 	}
@@ -108,9 +112,20 @@ func Parse(opts ...OptionParse) (*Templates, error) {
 		ts.common = ts.common.Option(srcs.CommonOptions...)
 	}
 	for _, src := range srcs.CommonTemplates {
-		ts.common, err = ts.common.New(src.Name).Parse(src.Text)
+		if src.NameInText {
+			ts.common = ts.common.New("")
+		} else {
+			ts.common = ts.common.New(src.Name)
+		}
+		ts.common, err = ts.common.Parse(src.Text)
 		if err != nil {
 			return ts, err
+		}
+		if len(src.CSS) > 0 {
+			ts.css[src.Name] = append(ts.css[src.Name], src.CSS...)
+		}
+		if len(src.JS) > 0 {
+			ts.js[src.Name] = append(ts.js[src.Name], src.JS...)
 		}
 	}
 	for _, src := range srcs.Templates {
@@ -119,9 +134,20 @@ func Parse(opts ...OptionParse) (*Templates, error) {
 		// parsing here? Will it cause problems in addParseTree? This is
 		// important because it allows for template-specific funcs without
 		// throwing everything into the common funcs namespace.
-		tmpl, err = template.New(src.Name).Funcs(srcs.CommonFuncs).Option(srcs.CommonOptions...).Parse(src.Text)
+		if src.NameInText {
+			tmpl = template.New("")
+		} else {
+			tmpl = template.New(src.Name)
+		}
+		tmpl, err = tmpl.Funcs(srcs.CommonFuncs).Option(srcs.CommonOptions...).Parse(src.Text)
 		if err != nil {
 			return ts, err
+		}
+		if len(src.CSS) > 0 {
+			ts.css[src.Name] = append(ts.css[src.Name], src.CSS...)
+		}
+		if len(src.JS) > 0 {
+			ts.js[src.Name] = append(ts.js[src.Name], src.JS...)
 		}
 		ts.lib[src.Name] = tmpl
 		cacheEntry, err = ts.common.Clone()
@@ -348,10 +374,41 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 		}
 		return nil
 	}
-	// used cached version if exists...
+	if data == nil {
+		data = make(map[string]interface{})
+	}
+	for _, datafunc := range ts.datafuncs {
+		datafunc(w, r, data)
+	}
 	fullname := strings.Join(append([]string{name}, names...), "\n")
-	if tmpl, ok := ts.cache[fullname]; ok {
-		err := executeTemplate(tmpl, w, ts.bufpool, name, data)
+	var jsList []JS
+	var cssList []CSS
+	cssSet, jsSet := make(map[*CSS]bool), make(map[*JS]bool)
+	invokedTemplates, err := ts.InvokedTemplates(fullname)
+	if err != nil {
+		return err
+	}
+	for _, invokedTemplate := range invokedTemplates {
+		for _, css := range ts.css[invokedTemplate] {
+			if cssSet[css] {
+				continue
+			}
+			cssSet[css] = true
+			cssList = append(cssList, *css)
+		}
+		for _, js := range ts.js[invokedTemplate] {
+			if jsSet[js] {
+				continue
+			}
+			jsSet[js] = true
+			jsList = append(jsList, *js)
+		}
+	}
+	data["__css__"] = cssList
+	data["__js__"] = jsList
+	// used cached version if exists...
+	if cacheEntry, ok := ts.cache[fullname]; ok {
+		err := executeTemplate(cacheEntry, w, ts.bufpool, name, data)
 		if err != nil {
 			return err
 		}
