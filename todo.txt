@@ -8,7 +8,6 @@
         <h1 id="contenteditable:title" class="contenteditable">You've yee-d your last haw</h1>
     template reader:
         <h1 id="contenteditable:title">You've <b>yee-d</b> your last haw</h1>
-- If I set a header in a middleware, can middlewares down the chain view what it is and edit it? My use case is being able to inject CSP hashes dynamically based on what which CSS/JS scripts are going to be rendered.
 - How do I compute a valid hash when given a static CSS/JS payload? Can it be computed programatically?
 - Hoooly shit I can walk the parse tree and find all template name invocations, then use that info to include CSS/JS payloads dynamically.
     - https://stackoverflow.com/questions/40584612/how-to-get-a-map-or-list-of-template-actions-from-a-parsed-template

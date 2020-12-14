@@ -32,6 +32,8 @@ type Source struct {
 	Text      string
 	Funcs     map[string]interface{}
 	Options   []string
+	CSS       []*CSS
+	JS        []*JS
 }
 
 type Sources struct {
@@ -53,23 +55,18 @@ type JS struct {
 	Hash string
 }
 
-type Template struct {
-	Name string
-	HTML *template.Template
-	CSS  []*CSS
-	JS   []*JS
-}
-
 type Templates struct {
 	bufpool *bpool.BufferPool
 	common  *template.Template            // gets included in every template in the cache
 	lib     map[string]*template.Template // never gets executed, main purpose for cloning
 	cache   map[string]*template.Template // is what gets executed, should not changed after it is set
+	css     map[string][]*CSS
+	js      map[string][]*JS
 	funcs   map[string]interface{}
 	opts    []string
 }
 
-type ParseOption func(*Sources) error
+type OptionParse func(*Sources) error
 
 func addParseTree(parent *template.Template, child *template.Template) error {
 	var err error
@@ -82,13 +79,15 @@ func addParseTree(parent *template.Template, child *template.Template) error {
 	return nil
 }
 
-func Parse(opts ...ParseOption) (*Templates, error) {
+func Parse(opts ...OptionParse) (*Templates, error) {
 	var err error
 	ts := &Templates{
 		bufpool: bpool.NewBufferPool(64),
 		common:  template.New(""),
 		lib:     make(map[string]*template.Template),
 		cache:   make(map[string]*template.Template),
+		css:     make(map[string][]*CSS),
+		js:      make(map[string][]*JS),
 	}
 	srcs := &Sources{
 		CommonFuncs: make(map[string]interface{}),
@@ -114,6 +113,10 @@ func Parse(opts ...ParseOption) (*Templates, error) {
 	}
 	for _, src := range srcs.Templates {
 		var tmpl, cacheEntry *template.Template
+		// TODO: is it safe to merge src.Funcs with srcs.CommonFuncs when
+		// parsing here? Will it cause problems in addParseTree? This is
+		// important because it allows for template-specific funcs without
+		// throwing everything into the common funcs namespace.
 		tmpl, err = template.New(src.Name).Funcs(srcs.CommonFuncs).Option(srcs.CommonOptions...).Parse(src.Text)
 		if err != nil {
 			return ts, err
@@ -133,7 +136,7 @@ func Parse(opts ...ParseOption) (*Templates, error) {
 	return ts, nil
 }
 
-func AddParse(base *Templates, opts ...ParseOption) (*Templates, error) {
+func AddParse(base *Templates, opts ...OptionParse) (*Templates, error) {
 	var err error
 	ts := &Templates{
 		bufpool: bpool.NewBufferPool(64),
@@ -205,7 +208,7 @@ func AddParse(base *Templates, opts ...ParseOption) (*Templates, error) {
 	return ts, nil
 }
 
-func AddCommonFiles(root string, filepatterns ...string) ParseOption {
+func AddCommonFiles(root string, filepatterns ...string) OptionParse {
 	return func(srcs *Sources) error {
 		for _, filepattern := range filepatterns {
 			filenames, err := filepath.Glob(root + filepattern)
@@ -239,7 +242,7 @@ func AddCommonFiles(root string, filepatterns ...string) ParseOption {
 	}
 }
 
-func AddFiles(root string, filepatterns ...string) ParseOption {
+func AddFiles(root string, filepatterns ...string) OptionParse {
 	return func(srcs *Sources) error {
 		for _, filepattern := range filepatterns {
 			filenames, err := filepath.Glob(root + filepattern)
@@ -273,7 +276,14 @@ func AddFiles(root string, filepatterns ...string) ParseOption {
 	}
 }
 
-func Funcs(funcs map[string]interface{}) ParseOption {
+func AddSources(src ...Source) OptionParse {
+	return func(srcs *Sources) error {
+		srcs.Templates = append(srcs.Templates, src...)
+		return nil
+	}
+}
+
+func Funcs(funcs map[string]interface{}) OptionParse {
 	return func(srcs *Sources) error {
 		for name, fn := range funcs {
 			srcs.CommonFuncs[name] = fn
@@ -282,7 +292,7 @@ func Funcs(funcs map[string]interface{}) ParseOption {
 	}
 }
 
-func Option(opts ...string) ParseOption {
+func Option(opts ...string) OptionParse {
 	return func(srcs *Sources) error {
 		srcs.CommonOptions = append(srcs.CommonOptions, opts...)
 		return nil

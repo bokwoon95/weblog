@@ -1,7 +1,12 @@
 package main
 
 import (
-	"html/template"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/bokwoon95/weblog/pagemanager/chi"
+	"github.com/bokwoon95/weblog/webtemplate"
 )
 
 // original idea: all templat plugins provide a Funcs(in)out method, templat will group them together at parse time
@@ -11,22 +16,33 @@ import (
 // - pagemanager plugins will benefit from being able to access pagemanager's common set of funcs and templates.
 //		so the real question is how to extend a templat templates. The problem is that it will def require an entire reparse because functions annoyingly can only be defined at parse time. You can't just addParseTree to the problem
 
-var f1 = map[string]interface{}{
-	"base1": func() string { return "b1" },
-	"base2": func() string { return "b2" },
-	"base3": func() string { return "b3" },
-}
-
-var f2 = map[string]interface{}{
-	"extend1": func() string { return "e1" },
-	"extend2": func() string { return "e2" },
-}
-
-var t1 = template.Must(template.
-	New("t1").
-	Funcs(f1).
-	Parse(`{{ base1 }} {{ base2 }} {{ base3 }}`),
-)
+const all_html = `
+{{ template "side1" . }}
+{{ template "side2" . }}
+{{ template "main.html" . }}
+this is all
+`
 
 func main() {
+	r := chi.NewRouter()
+	wt, err := webtemplate.Parse(
+		webtemplate.AddCommonFiles(webtemplate.Directory(0), "main.html"),
+		webtemplate.AddSources(webtemplate.Source{
+			Name: "all_html",
+			Text: all_html,
+		}),
+		Side1,
+		Side2,
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		err := wt.Render(w, r, nil, "all_html")
+		if err != nil {
+			log.Println(err)
+		}
+	})
+	fmt.Println("listening on :8080")
+	http.ListenAndServe(":8080", r)
 }
