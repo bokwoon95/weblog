@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"text/template/parse"
 
 	"github.com/oxtoacart/bpool"
 )
@@ -30,10 +31,11 @@ type Source struct {
 	Name      string
 	Filepaths []string
 	Text      string
-	Funcs     map[string]interface{}
-	Options   []string
 	CSS       []*CSS
 	JS        []*JS
+	// NOTE: still not sure if template-specific funcs are a good idea. Common funcs should be dumped in srcs.CommonFuncs, all funcs should be global?
+	Funcs   map[string]interface{}
+	Options []string
 }
 
 type Sources struct {
@@ -283,6 +285,13 @@ func AddSources(src ...Source) OptionParse {
 	}
 }
 
+func AddCommonSources(src ...Source) OptionParse {
+	return func(srcs *Sources) error {
+		srcs.CommonTemplates = append(srcs.CommonTemplates, src...)
+		return nil
+	}
+}
+
 func Funcs(funcs map[string]interface{}) OptionParse {
 	return func(srcs *Sources) error {
 		for name, fn := range funcs {
@@ -370,4 +379,52 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 		return err
 	}
 	return nil
+}
+
+func (ts *Templates) InvokedTemplates(name string) ([]string, error) {
+	var names []string
+	tmpl := ts.cache[name]
+	if tmpl == nil {
+		tmpl, _ = lookup(ts, name)
+		if tmpl == nil {
+			return names, fmt.Errorf("no template called '%s'", name)
+		}
+	}
+	tmpl = tmpl.Lookup(name)
+	if tmpl == nil {
+		return names, fmt.Errorf("Lookup() failed")
+	}
+	names = append(names, tmpl.Name())
+	var nameSet = make(map[string]bool)
+	var root parse.Node = tmpl.Tree.Root
+	var roots []parse.Node
+	for {
+		for _, name := range listTemplates(root) {
+			if !nameSet[name] {
+				if t := tmpl.Lookup(name); t != nil {
+					roots = append(roots, t.Tree.Root)
+				}
+				nameSet[name] = true
+				names = append(names, name)
+			}
+		}
+		if len(roots) == 0 {
+			break
+		}
+		root, roots = roots[0], roots[1:]
+	}
+	return names, nil
+}
+
+func listTemplates(node parse.Node) []string {
+	var names []string
+	switch node := node.(type) {
+	case *parse.TemplateNode:
+		names = append(names, node.Name)
+	case *parse.ListNode:
+		for _, n := range node.Nodes {
+			names = append(names, listTemplates(n)...)
+		}
+	}
+	return names
 }

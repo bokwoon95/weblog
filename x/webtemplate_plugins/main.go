@@ -19,6 +19,8 @@ import (
 const all_html = `
 {{ template "side1" . }}
 {{ template "side2" . }}
+calling side2: {{ side2 }}
+calling side2_helperfn: {{ side2_helperfn }}
 {{ template "main.html" . }}
 this is all
 `

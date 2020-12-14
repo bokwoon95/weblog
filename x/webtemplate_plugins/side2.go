@@ -24,5 +24,6 @@ func Side2(srcs *webtemplate.Sources) error {
 		},
 	}
 	srcs.CommonTemplates = append(srcs.CommonTemplates, src)
+	srcs.CommonFuncs["side2"] = func() string { return "side2" }
 	return nil
 }
