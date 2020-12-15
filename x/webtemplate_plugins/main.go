@@ -17,18 +17,18 @@ import (
 //		so the real question is how to extend a templat templates. The problem is that it will def require an entire reparse because functions annoyingly can only be defined at parse time. You can't just addParseTree to the problem
 
 const all_html = `
-{{ range $i, $css := .__css__ }}
+{{ range $i, $css := $.__wt_css__ }}
 <style>
 {{ $css.Text }}
 </style>
 {{ end }}
-{{ template "side1" . }}
-{{ template "side2" . }}
+{{ template "side1" $ }}
+{{ template "side2" $ }}
 calling side2: {{ side2 }}
-{{ template "main.html" . }}
+{{ template "main.html" $ }}
 this is all
 <br>
-{{ range $i, $js := .__js__ }}
+{{ range $i, $js := $.__wt_js__ }}
 <script>
 {{ $js.Text }}
 </script>

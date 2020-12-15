@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"text/template/parse"
 
 	"github.com/oxtoacart/bpool"
@@ -62,13 +63,16 @@ type JS struct {
 type Templates struct {
 	bufpool   *bpool.BufferPool
 	common    *template.Template            // gets included in every template in the cache
-	lib       map[string]*template.Template // never gets executed, main purpose for cloning
-	cache     map[string]*template.Template // is what gets executed, should not changed after it is set
-	css       map[string][]*CSS
-	js        map[string][]*JS
+	tmplLib   map[string]*template.Template // never gets executed, main purpose for cloning
+	cssLib    map[string][]*CSS
+	jsLib     map[string][]*JS
+	tmplCache map[string]*template.Template // is what gets executed, should not changed after it is set
+	cssCache  map[string][]CSS
+	jsCache   map[string][]JS
 	funcs     map[string]interface{}
 	opts      []string
 	datafuncs []func(http.ResponseWriter, *http.Request, map[string]interface{})
+	mu *sync.RWMutex
 }
 
 type OptionParse func(*Sources) error
@@ -87,12 +91,12 @@ func addParseTree(parent *template.Template, child *template.Template) error {
 func Parse(opts ...OptionParse) (*Templates, error) {
 	var err error
 	ts := &Templates{
-		bufpool: bpool.NewBufferPool(64),
-		common:  template.New(""),
-		lib:     make(map[string]*template.Template),
-		cache:   make(map[string]*template.Template),
-		css:     make(map[string][]*CSS),
-		js:      make(map[string][]*JS),
+		bufpool:   bpool.NewBufferPool(64),
+		common:    template.New(""),
+		tmplLib:   make(map[string]*template.Template),
+		tmplCache: make(map[string]*template.Template),
+		cssLib:    make(map[string][]*CSS),
+		jsLib:     make(map[string][]*JS),
 	}
 	srcs := &Sources{
 		CommonFuncs: make(map[string]interface{}),
@@ -122,10 +126,10 @@ func Parse(opts ...OptionParse) (*Templates, error) {
 			return ts, err
 		}
 		if len(src.CSS) > 0 {
-			ts.css[src.Name] = append(ts.css[src.Name], src.CSS...)
+			ts.cssLib[src.Name] = append(ts.cssLib[src.Name], src.CSS...)
 		}
 		if len(src.JS) > 0 {
-			ts.js[src.Name] = append(ts.js[src.Name], src.JS...)
+			ts.jsLib[src.Name] = append(ts.jsLib[src.Name], src.JS...)
 		}
 	}
 	for _, src := range srcs.Templates {
@@ -144,12 +148,12 @@ func Parse(opts ...OptionParse) (*Templates, error) {
 			return ts, err
 		}
 		if len(src.CSS) > 0 {
-			ts.css[src.Name] = append(ts.css[src.Name], src.CSS...)
+			ts.cssLib[src.Name] = append(ts.cssLib[src.Name], src.CSS...)
 		}
 		if len(src.JS) > 0 {
-			ts.js[src.Name] = append(ts.js[src.Name], src.JS...)
+			ts.jsLib[src.Name] = append(ts.jsLib[src.Name], src.JS...)
 		}
-		ts.lib[src.Name] = tmpl
+		ts.tmplLib[src.Name] = tmpl
 		cacheEntry, err = ts.common.Clone()
 		if err != nil {
 			return ts, err
@@ -159,7 +163,7 @@ func Parse(opts ...OptionParse) (*Templates, error) {
 		if err != nil {
 			return ts, err
 		}
-		ts.cache[src.Name] = cacheEntry
+		ts.tmplCache[src.Name] = cacheEntry
 	}
 	return ts, nil
 }
@@ -167,9 +171,9 @@ func Parse(opts ...OptionParse) (*Templates, error) {
 func AddParse(base *Templates, opts ...OptionParse) (*Templates, error) {
 	var err error
 	ts := &Templates{
-		bufpool: bpool.NewBufferPool(64),
-		lib:     make(map[string]*template.Template),
-		cache:   make(map[string]*template.Template),
+		bufpool:   bpool.NewBufferPool(64),
+		tmplLib:   make(map[string]*template.Template),
+		tmplCache: make(map[string]*template.Template),
 	}
 	// Clone base.common
 	ts.common, err = base.common.Clone()
@@ -177,12 +181,12 @@ func AddParse(base *Templates, opts ...OptionParse) (*Templates, error) {
 		return ts, err
 	}
 	// Clone base.lib and regenerate base.cache
-	for name, tmpl := range base.lib {
+	for name, tmpl := range base.tmplLib {
 		libTmpl, err := tmpl.Clone()
 		if err != nil {
 			return ts, err
 		}
-		ts.lib[name] = libTmpl
+		ts.tmplLib[name] = libTmpl
 		cacheEntry, err := ts.common.Clone()
 		if err != nil {
 			return ts, err
@@ -192,7 +196,7 @@ func AddParse(base *Templates, opts ...OptionParse) (*Templates, error) {
 		if err != nil {
 			return ts, err
 		}
-		ts.cache[name] = cacheEntry
+		ts.tmplCache[name] = cacheEntry
 	}
 	srcs := &Sources{
 		CommonFuncs: make(map[string]interface{}),
@@ -221,7 +225,7 @@ func AddParse(base *Templates, opts ...OptionParse) (*Templates, error) {
 		if err != nil {
 			return ts, err
 		}
-		ts.lib[src.Name] = tmpl
+		ts.tmplLib[src.Name] = tmpl
 		cacheEntry, err = ts.common.Clone()
 		if err != nil {
 			return ts, err
@@ -231,7 +235,7 @@ func AddParse(base *Templates, opts ...OptionParse) (*Templates, error) {
 		if err != nil {
 			return ts, err
 		}
-		ts.cache[src.Name] = cacheEntry
+		ts.tmplCache[src.Name] = cacheEntry
 	}
 	return ts, nil
 }
@@ -335,7 +339,7 @@ func Option(opts ...string) OptionParse {
 }
 
 func lookup(ts *Templates, name string) (tmpl *template.Template, isCommon bool) {
-	tmpl = ts.lib[name]
+	tmpl = ts.tmplLib[name]
 	if tmpl != nil {
 		return tmpl, false
 	}
@@ -380,6 +384,7 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 	for _, datafunc := range ts.datafuncs {
 		datafunc(w, r, data)
 	}
+	// used cached version if exists...
 	fullname := strings.Join(append([]string{name}, names...), "\n")
 	var jsList []JS
 	var cssList []CSS
@@ -389,14 +394,14 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 		return err
 	}
 	for _, invokedTemplate := range invokedTemplates {
-		for _, css := range ts.css[invokedTemplate] {
+		for _, css := range ts.cssLib[invokedTemplate] {
 			if cssSet[css] {
 				continue
 			}
 			cssSet[css] = true
 			cssList = append(cssList, *css)
 		}
-		for _, js := range ts.js[invokedTemplate] {
+		for _, js := range ts.jsLib[invokedTemplate] {
 			if jsSet[js] {
 				continue
 			}
@@ -404,10 +409,9 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 			jsList = append(jsList, *js)
 		}
 	}
-	data["__css__"] = cssList
-	data["__js__"] = jsList
-	// used cached version if exists...
-	if cacheEntry, ok := ts.cache[fullname]; ok {
+	data["__wt_css__"] = cssList
+	data["__wt_js__"] = jsList
+	if cacheEntry, ok := ts.tmplCache[fullname]; ok {
 		err := executeTemplate(cacheEntry, w, ts.bufpool, name, data)
 		if err != nil {
 			return err
@@ -430,7 +434,7 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 			return err
 		}
 	}
-	ts.cache[fullname] = cacheEntry
+	ts.tmplCache[fullname] = cacheEntry
 	err = executeTemplate(cacheEntry, w, ts.bufpool, name, data)
 	if err != nil {
 		return err
@@ -440,14 +444,15 @@ func (ts *Templates) Render(w http.ResponseWriter, r *http.Request, data map[str
 
 func (ts *Templates) InvokedTemplates(name string) ([]string, error) {
 	var names []string
-	tmpl := ts.cache[name]
+	tmpl := ts.tmplCache[name]
 	if tmpl == nil {
-		tmpl, _ = lookup(ts, name)
+		// tmpl, _ = lookup(ts, name)
+		tmpl = ts.common.Lookup(name)
 		if tmpl == nil {
 			return names, fmt.Errorf("no template called '%s'", name)
 		}
 	}
-	tmpl = tmpl.Lookup(name)
+	tmpl = tmpl.Lookup(name) // set the main tmpl to the `name`
 	if tmpl == nil {
 		return names, fmt.Errorf("Lookup() failed")
 	}
@@ -458,11 +463,12 @@ func (ts *Templates) InvokedTemplates(name string) ([]string, error) {
 	for {
 		for _, name := range listTemplates(root) {
 			if !nameSet[name] {
-				if t := tmpl.Lookup(name); t != nil {
-					roots = append(roots, t.Tree.Root)
-				}
 				nameSet[name] = true
 				names = append(names, name)
+				t := tmpl.Lookup(name)
+				if t != nil {
+					roots = append(roots, t.Tree.Root)
+				}
 			}
 		}
 		if len(roots) == 0 {
@@ -474,6 +480,7 @@ func (ts *Templates) InvokedTemplates(name string) ([]string, error) {
 }
 
 func listTemplates(node parse.Node) []string {
+	// NOTE: I think I can make this recursion tail-call optimized, or convert it to a for loop
 	var names []string
 	switch node := node.(type) {
 	case *parse.TemplateNode:
