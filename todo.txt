@@ -1,16 +1,9 @@
-- TODO: Still need to figure out:
-    - How to organize templates? User preps TemplateSource, TemplateSources? Then transfer data over to the more private Template/Templates structs?
-    - Common templates are already baked into the *template.Template, right? How about common Assets? And common preprocessors? How should they be reachable?
-        - While the Template either holds info needed to either parse from scratch or a pre-cached *template.Template, I think the common assets/preprocessors should reside in the *Templates struct.
-        - In fact I think a Template by itself should not be exposed to the user at all. It simply doesn't make sense without the greater context of the common assets and common preprocessors. And I'm not making those public in case the user modifies them mid-request and causes a race condition.
-    - How to settle template names? I know their names by default should be their file path in the FS. But then what about template that are overriding some kind of base template? If you invoke these templates by their name, the *template.Template should execute the base template instead. How should users indicate that? Where in the struct do I store this info?
-- Adding the CSP script-src-elem and style-src-elem policies should be inside a prerenderHook. This is because the assets are only known when the template is known i.e. after the call to Render(). And instead of making the hash an Asset field, I should make a cache mapping the File.FullName() to the hash so I don't have to compute the hash for every damn asset, instead I just look it up in the map. If not exist I'll hash it on the spot and store it back in the map (this will require a RWMutex).
-- PrerenderFuncs and PostrenderFuncs!
-    - PrerenderFuncs are good for injecting additional data. Unfortunately I think it means they have to take in an interface{} and not a map[string]interface{} because some JSON PrerenderFuncs might need to type assert the interface{} to a concrete struct.
-        - And that means the function signature is func(w http.ResponseWriter, r *http.Request, input interface{}) (output interface{})
-    - PostrenderFuncs are good for collecting metrics. That is it. And maybe cleaning up request-scoped resources but I don't think those exist because hardly anybody has managed to inject postrender hooks like this library does.
-- Rename library to renderx
-- Incoming IP (with country), Request Payload Size, Request Start Time, Request End Time, Response Payload Size, Response Status Code, Canonical Log Fields
+- Need some way to Lookup() pages without rendering so that hot pages can be prepped on startup with Lookup(). Does that mean I have to export the Page type? Should I allow the user to access the Page fields and do rendering on their own?
+    - I'm super leery about giving write access to the []*assets because users might try to edit it mid request and cause a race condition.
+- FileServer implementation, allowing users to either inline their assets or serve it externally. I think there can be an automatic rule that big assets get translated to external assets, while small assets can be inlined. The user can set the size threshold if they want.
+    - Other than that there should also be some way to manually indictating if you want to serve an asset externally or not (default is inline).
+- Incoming IP (with country), Request Payload Size, Request Start Time, Request End Time, Response Payload Size, Response Status Code, Other Canonical Log Fields (user_id, etc)
+- Create a nice, stand-in 500 response handler that the user can use while prototyping, which can be swapped with their own custom handler anytime.
 
 libraries define a name struct that maps all their library names to the actual names. When instantiating templates and shit they have to metatemplate using this struct. Such that the templates themselves are configurable by the user. The template names, the function names, the data names, all configured by modifying values in the struct (or should it be a map? map means the user has to lookup the docs for the names instead of just looking at the struct fields but maybe that's an acceptable compromise).
     - This means I need some kind of translation function that can read in the struct (or map), read in the File (from the native/embedded filesystem) and output another File. I can programatically edit Files.
@@ -30,13 +23,14 @@ libraries define a name struct that maps all their library names to the actual n
 - How to make persist changes to contenteditable elements to the database, and how to then retrieve it?
     - every contenteditable element has an id which is the key. The innerHTML is the value. A javascript function gathers up items tagged with '.conteneditable' into a JSON payload and does a POST request to /pm-kv. On success it simply reloads the current page.
 - What does the API for user-editable fields look like to the template creator?
-    <h1 id="plugin_name:title" class="{{ template "pagemanager:contenteditable" . }}">
-        {{ $res := pm_kv "plugin_name:title" }}
-        {{ if $res.Valid }}{{ $res.Value }}{{ else }}default text{{ end }}
+    <h1 id="plugin_name:title" class="{{ if .__edit_mode__ }}pm-contenteditable{{ end }}">
+        {{ $value := pm_kv "plugin_name:title" }}
+        {{ if $value.Valid }}{{ $value.HTML }}{{ else }}default text{{ end }}
     </h1>
     - pm_kv "plugin_name:title" will pull the relevant value from the database/cache.
     - id="plugin_name:title" together with class="pm-contenteditable" will trigger a pagemanager javascript snippet to transform it into a contenteditable element, and then pulls the value from that element and saves it to the database/cache.
     - quite neat! This isn't even blog stuff, it's inherent in pagemanager. You can use this system for any kind of template that targets pagemanager.
+- How does chi's json/markdown renderer reflect on the middleware/handler names? Did it manage to obtain the handler from a route? I need that.
 
 - wt comes with a few map-related helper template functions (that can be optionally disabled by the user)
     - wt_dict: constructs a new map
@@ -46,3 +40,12 @@ libraries define a name struct that maps all their library names to the actual n
 
 long term goals:
 - pagemanager should be able to read html/markdown files from the current folder (user-configurable) and translate it into static HTML pages in the pm_routes table. This allows users to manually edit markdown files with their favorite text editor, and also allows for large-scale collaboration by making wrapping the files in a git repo (git ignoring the pagemanager binary and sqlite database file of course).
+
+pagemanager/pagemanager
+pagemanager/blog
+pagemanager/sq
+pagemanager/erro
+pagemanager/render
+pagemanager/validator
+pagemanager/form
+pagemanager/handlerutil

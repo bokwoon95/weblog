@@ -1,4 +1,4 @@
-package renderx
+package fs
 
 import (
 	"io"

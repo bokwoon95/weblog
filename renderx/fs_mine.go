@@ -4,25 +4,18 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/bokwoon95/weblog/renderx/fs"
 )
 
-type NamedFS struct {
-	FS
+type File struct {
+	FS   fs.FS
 	Name string
 }
 
-type Fyle struct {
-	FS   NamedFS
-	Name string
-}
-
-func (c Fyle) ReadString() (string, error) {
-	b, err := ReadFile(c.FS, c.Name)
+func (c File) ReadString() (string, error) {
+	b, err := fs.ReadFile(c.FS, c.Name)
 	return string(b), err
-}
-
-func (c Fyle) FullName() string {
-	return c.FS.Name + string(os.PathSeparator) + c.Name
 }
 
 func AbsDir(skip int) string {
