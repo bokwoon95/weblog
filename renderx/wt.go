@@ -1,4 +1,4 @@
-package wt
+package renderx
 
 import (
 	"html/template"
