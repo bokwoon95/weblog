@@ -1,9 +1,16 @@
-package fs
+package renderly
 
 import (
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 )
+
+func AbsDir(relativePath string) string {
+	_, absolutePath, _, _ := runtime.Caller(1)
+	return filepath.Join(absolutePath, relativePath)
+}
 
 // fs.FS
 type FS interface {

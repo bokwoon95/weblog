@@ -1,13 +1,20 @@
-- Need some way to Lookup() pages without rendering so that hot pages can be prepped on startup with Lookup(). Does that mean I have to export the Page type? Should I allow the user to access the Page fields and do rendering on their own?
-    - I'm super leery about giving write access to the []*assets because users might try to edit it mid request and cause a race condition.
-- FileServer implementation, allowing users to either inline their assets or serve it externally. I think there can be an automatic rule that big assets get translated to external assets, while small assets can be inlined. The user can set the size threshold if they want.
-    - Other than that there should also be some way to manually indictating if you want to serve an asset externally or not (default is inline).
-- Incoming IP (with country), Request Payload Size, Request Start Time, Request End Time, Response Payload Size, Response Status Code, Other Canonical Log Fields (user_id, etc)
+- renderutil metrics:
+    - Incoming IP (with country), Request Payload Size, Request Start Time, Request End Time, Response Payload Size, Response Status Code, Other Canonical Log Fields (user_id, etc)
 - Create a nice, stand-in 500 response handler that the user can use while prototyping, which can be swapped with their own custom handler anytime.
 
 libraries define a name struct that maps all their library names to the actual names. When instantiating templates and shit they have to metatemplate using this struct. Such that the templates themselves are configurable by the user. The template names, the function names, the data names, all configured by modifying values in the struct (or should it be a map? map means the user has to lookup the docs for the names instead of just looking at the struct fields but maybe that's an acceptable compromise).
-    - This means I need some kind of translation function that can read in the struct (or map), read in the File (from the native/embedded filesystem) and output another File. I can programatically edit Files.
-    - This is done by creating some kind of translation FS that can be created with pure strings produced by reading another FS.
+
+allow prerender and postrender hooks to be addable and deleteable separately instead of defining everything at the star.
+
+when vendors are adding their own templates/cssdeps/jsdeps, you can check for naming conflicts and raise an error. This will help with the global namespace situation by letting the user know when a naming conflict occurs.
+
+I think vendor css/js urls can be named after the template they are associated with. If there are consecutive css/js assets associated with a template they can be consecutively numbered.
+    This will make it easier for the *Render static file server handler to work as well.
+    Still haven't figured out how to secure the file server handler to not dump the user's source files if requested. Need some kind of whitelisting/blacklisting.
+
+The way for you to include css/js unconditionally is to add it to the map with the key as an empty string
+
+The template to be executed is the first non-css/non-js file provided, not actually the first file. I am not sure if this is a good thing.
 
 - Move the computation of CSS/JS payloads for each solo template to Parse() time (i.e. cached, just like with templates).
     - https://stackoverflow.com/questions/40584612/how-to-get-a-map-or-list-of-template-actions-from-a-parsed-template
@@ -37,6 +44,8 @@ libraries define a name struct that maps all their library names to the actual n
     - wt_dict_add: makes a copy of the first map argument, then adds the subsequent key values to it
     - wt_dict_cherrypick/filter: makes a copy of the first map argument by only picking the key arguments passed to it
     - or should I do wt_map_graft instead? wt_map_graft $ (wt_map key1 value1 key2 value2 ...)
+
+I will eventually have to think about serving assets externally instead of inline. But first I must get the inline implementation working.
 
 long term goals:
 - pagemanager should be able to read html/markdown files from the current folder (user-configurable) and translate it into static HTML pages in the pm_routes table. This allows users to manually edit markdown files with their favorite text editor, and also allows for large-scale collaboration by making wrapping the files in a git repo (git ignoring the pagemanager binary and sqlite database file of course).
