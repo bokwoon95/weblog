@@ -192,7 +192,7 @@ func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 	return page, nil
 }
 
-var r1 = regexp.MustCompile(`(?:;|^)\s*frame-ancestors[^;]*\s*`)
+var r1 = regexp.MustCompile(`(?:;|^)\s*(?:frame-ancestors|report-uri|sandbox)[^;]*\s*`)
 
 func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}) error {
 	var err error
@@ -211,10 +211,6 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 		}
 		if len(page.js) > 0 {
 			mapdata["__js__"] = page.JS(w)
-		}
-		mapdata["__nonce__"], err = page.Nonce(w)
-		if err != nil {
-			return err
 		}
 		// this must be computed -AFTER- making the necessary changes to the
 		// CSP header! So that it will reflect the latest version of CSP.
