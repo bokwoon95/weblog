@@ -11,6 +11,8 @@ import (
 	"github.com/golang/gddo/httputil/header"
 )
 
+// copied from https://www.alexedwards.net/blog/how-to-properly-parse-a-json-request-body
+
 type malformedRequest struct {
 	status int
 	msg    string

@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"strconv"
 
 	sq "github.com/bokwoon95/go-structured-query/postgres"
 	"github.com/bokwoon95/weblog/pagemanager/chi"
@@ -77,14 +75,9 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 		io.WriteString(w, "Welcome to the pagemanager dashboard")
 	})
 	pm.Router.Post("/pm-kv", pm.KVPost)
-	var count int
-	err = pm.DB.QueryRow("SELECT COUNT(*) FROM pm_routes").Scan(&count)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	pm.Router.Get("/restart", func(w http.ResponseWriter, r *http.Request) {
+	pm.Router.Post("/restart", func(w http.ResponseWriter, r *http.Request) {
 		pm.Restart <- struct{}{}
-		io.WriteString(w, "restarted\nThere are "+strconv.Itoa(count)+" rows in pm_routes")
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	})
 	// HTMLPolicy
 	pm.HTMLPolicy = bluemonday.UGCPolicy()
@@ -107,6 +100,7 @@ func (pm *PageManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// page cached?
 	if value, ok := pm.Cache.Get(pageKey + r.URL.Path); ok {
 		if page, ok := value.(string); ok {
+			fmt.Println("serving page", r.URL, "from cache")
 			io.WriteString(w, page)
 			return
 		} else {

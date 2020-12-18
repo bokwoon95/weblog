@@ -72,7 +72,7 @@ type Templates struct {
 	funcs     map[string]interface{}
 	opts      []string
 	datafuncs []func(http.ResponseWriter, *http.Request, map[string]interface{})
-	mu *sync.RWMutex
+	mu        *sync.RWMutex
 }
 
 type OptionParse func(*Sources) error

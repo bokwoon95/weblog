@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"net/http"
 	"path/filepath"
 	"regexp"
@@ -24,13 +25,13 @@ type Page struct {
 	posthooks []Posthook
 }
 
-func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
+func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 	fullname := strings.Join(append([]string{name}, names...), "\n")
 	// If page is already cached for the given fullname, return that page and exit
-	if rn.cacheenabled {
-		rn.mu.RLock()
-		page, ok := rn.cachepage[fullname]
-		rn.mu.RUnlock()
+	if ry.cacheenabled {
+		ry.mu.RLock()
+		page, ok := ry.cachepage[fullname]
+		ry.mu.RUnlock()
 		if ok {
 			return page, nil
 		}
@@ -38,43 +39,43 @@ func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
 	var err error
 	// Else construct the page from scratch
 	page := Page{
-		bufpool:   rn.bufpool,
-		css:       rn.css[""],       // global css assets
-		js:        rn.js[""],        // global js assets
-		prehooks:  rn.prehooks[""],  // global prehooks
-		posthooks: rn.posthooks[""], // global posthooks
+		bufpool:   ry.bufpool,
+		css:       ry.css[""],       // global css assets
+		js:        ry.js[""],        // global js assets
+		prehooks:  ry.prehooks[""],  // global prehooks
+		posthooks: ry.posthooks[""], // global posthooks
 	}
 	// Clone the page template from the base template
-	page.html, err = rn.html.Clone()
+	page.html, err = ry.html.Clone()
 	if err != nil {
 		return page, err
 	}
-	page.html = page.html.Option(rn.opts...)
+	page.html = page.html.Option(ry.opts...)
 	HTML, CSS, JS := categorize(append([]string{name}, names...))
 	// Add user-specified HTML templates to the page template
 	for _, Name := range HTML {
 		var t *template.Template
 		// If the template is already cached for the given file Name, use that template
-		if rn.cacheenabled {
-			rn.mu.RLock()
-			t = rn.cachehtml[Name]
-			rn.mu.RUnlock()
+		if ry.cacheenabled {
+			ry.mu.RLock()
+			t = ry.cachehtml[Name]
+			ry.mu.RUnlock()
 		}
 		// Else construct the template from scratch
 		if t == nil {
-			b, err := ReadFile(rn.fs, Name)
+			b, err := fs.ReadFile(ry.fs, Name)
 			if err != nil {
 				return page, err
 			}
-			t, err = template.New(Name).Funcs(rn.funcs).Option(rn.opts...).Parse(string(b))
+			t, err = template.New(Name).Funcs(ry.funcs).Option(ry.opts...).Parse(string(b))
 			if err != nil {
 				return page, err
 			}
 			// Cache the template if the user enabled it
-			if rn.cacheenabled {
-				rn.mu.Lock()
-				rn.cachehtml[Name] = t
-				rn.mu.Unlock()
+			if ry.cacheenabled {
+				ry.mu.Lock()
+				ry.cachehtml[Name] = t
+				ry.mu.Unlock()
 			}
 		}
 		// Add to page template
@@ -95,35 +96,35 @@ func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
 	cssset := make(map[[32]byte]struct{})
 	jsset := make(map[[32]byte]struct{})
 	for _, templateName := range depedencies {
-		for _, asset := range rn.css[templateName] {
+		for _, asset := range ry.css[templateName] {
 			if _, ok := cssset[asset.Hash]; ok {
 				continue
 			}
 			cssset[asset.Hash] = struct{}{}
 			page.css = append(page.css, asset)
 		}
-		for _, asset := range rn.js[templateName] {
+		for _, asset := range ry.js[templateName] {
 			if _, ok := jsset[asset.Hash]; ok {
 				continue
 			}
 			jsset[asset.Hash] = struct{}{}
 			page.js = append(page.js, asset)
 		}
-		page.prehooks = append(page.prehooks, rn.prehooks[templateName]...)
-		page.posthooks = append(page.posthooks, rn.posthooks[templateName]...)
+		page.prehooks = append(page.prehooks, ry.prehooks[templateName]...)
+		page.posthooks = append(page.posthooks, ry.posthooks[templateName]...)
 	}
 	// Add the user-specified CSS files to the page
 	for _, Name := range CSS {
 		var asset *Asset
 		// If CSS asset is already cached for the given file name, use that asset
-		if rn.cacheenabled {
-			rn.mu.RLock()
-			asset = rn.cachecss[Name]
-			rn.mu.RUnlock()
+		if ry.cacheenabled {
+			ry.mu.RLock()
+			asset = ry.cachecss[Name]
+			ry.mu.RUnlock()
 		}
 		// Else construct the CSS asset from scratch
 		if asset == nil {
-			b, err := ReadFile(rn.fs, Name)
+			b, err := fs.ReadFile(ry.fs, Name)
 			if err != nil {
 				return page, err
 			}
@@ -132,10 +133,10 @@ func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
 				Hash: sha256.Sum256(b),
 			}
 			// Cache the CSS asset if the user enabled it
-			if rn.cacheenabled {
-				rn.mu.Lock()
-				rn.cachecss[Name] = asset
-				rn.mu.Unlock()
+			if ry.cacheenabled {
+				ry.mu.Lock()
+				ry.cachecss[Name] = asset
+				ry.mu.Unlock()
 			}
 		}
 		// Add CSS asset to page if it hasn't already been added
@@ -148,14 +149,14 @@ func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
 	for _, Name := range JS {
 		var asset *Asset
 		// If JS asset is already cached for the given file name, use that asset
-		if rn.cacheenabled {
-			rn.mu.RLock()
-			asset = rn.cachejs[Name]
-			rn.mu.RUnlock()
+		if ry.cacheenabled {
+			ry.mu.RLock()
+			asset = ry.cachejs[Name]
+			ry.mu.RUnlock()
 		}
 		// Else construct the JS asset from scratch
 		if asset == nil {
-			b, err := ReadFile(rn.fs, Name)
+			b, err := fs.ReadFile(ry.fs, Name)
 			if err != nil {
 				return page, err
 			}
@@ -164,10 +165,10 @@ func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
 				Hash: sha256.Sum256(b),
 			}
 			// Cache the JS asset if the user enabled it
-			if rn.cacheenabled {
-				rn.mu.Lock()
-				rn.cachejs[Name] = asset
-				rn.mu.Unlock()
+			if ry.cacheenabled {
+				ry.mu.Lock()
+				ry.cachejs[Name] = asset
+				ry.mu.Unlock()
 			}
 		}
 		// Add JS asset to page if it hasn't already been added
@@ -177,10 +178,10 @@ func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
 		}
 	}
 	// Cache the page if the user enabled it
-	if rn.cacheenabled {
-		rn.mu.Lock()
-		rn.cachepage[fullname] = page
-		rn.mu.Unlock()
+	if ry.cacheenabled {
+		ry.mu.Lock()
+		ry.cachepage[fullname] = page
+		ry.mu.Unlock()
 	}
 	return page, nil
 }
