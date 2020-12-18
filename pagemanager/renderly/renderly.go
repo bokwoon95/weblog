@@ -3,6 +3,7 @@ package renderly
 import (
 	"crypto/sha256"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/bokwoon95/weblog/pagemanager/erro"
 	"github.com/oxtoacart/bpool"
 )
 
@@ -31,6 +33,8 @@ type Renderly struct {
 	cachehtml    map[string]*template.Template
 	cachecss     map[string]*Asset
 	cachejs      map[string]*Asset
+	//
+	errorhandler func(http.ResponseWriter, *http.Request, error)
 }
 
 type Asset struct {
@@ -44,7 +48,20 @@ type Posthook func(http.ResponseWriter, *http.Request) error
 
 func New(fs fs.FS, opts ...Option) (*Renderly, error) {
 	ry := &Renderly{
-		fs: fs,
+		fs:      fs,
+		bufpool: bpool.NewBufferPool(64),
+		funcs:   make(map[string]interface{}),
+		// plugin
+		html:      template.New(""),
+		css:       make(map[string][]*Asset),
+		js:        make(map[string][]*Asset),
+		prehooks:  make(map[string][]Prehook),
+		posthooks: make(map[string][]Posthook),
+		// fs cache
+		cachepage: make(map[string]Page),
+		cachehtml: make(map[string]*template.Template),
+		cachecss:  make(map[string]*Asset),
+		cachejs:   make(map[string]*Asset),
 	}
 	var err error
 	for _, opt := range opts {
@@ -59,13 +76,21 @@ func New(fs fs.FS, opts ...Option) (*Renderly, error) {
 func (ry *Renderly) Page(w http.ResponseWriter, r *http.Request, data interface{}, name string, names ...string) error {
 	page, err := ry.Lookup(name, names...)
 	if err != nil {
-		return err
+		return erro.Wrap(err)
 	}
 	err = page.Render(w, r, data)
 	if err != nil {
-		return err
+		return erro.Wrap(err)
 	}
 	return nil
+}
+
+func (ry *Renderly) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
+	if ry.errorhandler != nil {
+		ry.errorhandler(w, r, err)
+		return
+	}
+	io.WriteString(w, erro.Sdump(err))
 }
 
 type Option func(*Renderly) error
@@ -144,7 +169,7 @@ func GlobalTemplates(fsys fs.FS, name string, names ...string) Option {
 
 func AbsDir(relativePath string) string {
 	_, absolutePath, _, _ := runtime.Caller(1)
-	return filepath.Join(absolutePath, relativePath) + string(os.PathSeparator)
+	return filepath.Join(absolutePath, "..", relativePath) + string(os.PathSeparator)
 }
 
 type Plugin struct {

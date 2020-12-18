@@ -2,7 +2,7 @@ package renderly
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"io"
@@ -13,6 +13,7 @@ import (
 	"strings"
 	"text/template/parse"
 
+	"github.com/bokwoon95/weblog/pagemanager/erro"
 	"github.com/oxtoacart/bpool"
 )
 
@@ -177,6 +178,10 @@ func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 			page.js = append(page.js, asset)
 		}
 	}
+	page.html = page.html.Lookup(name)
+	if page.html == nil {
+		return page, erro.Wrap(fmt.Errorf(`no templated found for name "%s"`, name))
+	}
 	// Cache the page if the user enabled it
 	if ry.cacheenabled {
 		ry.mu.Lock()
@@ -185,6 +190,8 @@ func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 	}
 	return page, nil
 }
+
+var r1 = regexp.MustCompile(`(?:;|^)\s*frame-ancestors[^;]*\s*`)
 
 func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}) error {
 	var err error
@@ -206,12 +213,14 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 		styles.WriteString(asset.Data)
 		styles.WriteString("</style>")
 		styleHashes.WriteString("'sha256-")
-		styleHashes.WriteString(hex.EncodeToString(asset.Hash[0:]))
+		styleHashes.WriteString(base64.StdEncoding.EncodeToString(asset.Hash[0:]))
 		styleHashes.WriteString("'")
 	}
-	err = appendCSP(w, "style-src-elem", styleHashes.String())
-	if err != nil {
-		return err
+	if styleHashes.Len() > 0 {
+		err = appendCSP(w, "style-src-elem", styleHashes.String())
+		if err != nil {
+			return err
+		}
 	}
 	// Write Content-Security-Policy script-src-elem
 	scripts := &strings.Builder{}
@@ -225,16 +234,29 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 		scripts.WriteString(asset.Data)
 		scripts.WriteString("</script>")
 		scriptHashes.WriteString("'sha256-")
-		scriptHashes.WriteString(hex.EncodeToString(asset.Hash[0:]))
+		scriptHashes.WriteString(base64.StdEncoding.EncodeToString(asset.Hash[0:]))
 		scriptHashes.WriteString("'")
 	}
-	err = appendCSP(w, "script-src-elem", scriptHashes.String())
-	if err != nil {
-		return err
+	if scriptHashes.Len() > 0 {
+		err = appendCSP(w, "script-src-elem", scriptHashes.String())
+		if err != nil {
+			return err
+		}
+	}
+	if data == nil {
+		data = make(map[string]interface{})
 	}
 	if mapdata, ok := data.(map[string]interface{}); ok {
-		mapdata["__css__"] = template.HTML(styles.String())
-		mapdata["__js__"] = template.HTML(scripts.String())
+		if CSP := w.Header().Get("Content-Security-Policy"); CSP != "" {
+			CSP = r1.ReplaceAllString(CSP, "") // not sure if this is worth doing but ok
+			mapdata["__Content_Security_Policy__"] = template.HTML(fmt.Sprintf(`<meta http-equiv="Content-Security-Policy" content="%s">`, CSP))
+		}
+		if styles.Len() > 0 {
+			mapdata["__css__"] = template.HTML(styles.String())
+		}
+		if scripts.Len() > 0 {
+			mapdata["__js__"] = template.HTML(scripts.String())
+		}
 		data = mapdata
 	}
 	err = executeTemplate(page.html, page.bufpool, w, page.html.Name(), data)
@@ -251,14 +273,14 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 }
 
 func listAllDeps(t *template.Template, name string) ([]string, error) {
+	t = t.Lookup(name) // set the main template to `name`
+	if t == nil {
+		return nil, fmt.Errorf(`no such template "%s"`, name)
+	}
 	var allnames = []string{t.Name()}
 	var set = make(map[string]struct{})
 	var root parse.Node = t.Tree.Root
 	var roots []parse.Node
-	t = t.Lookup(name) // set the main template to `name`
-	if t == nil {
-		return allnames, fmt.Errorf(`no such template "%s"`, name)
-	}
 	for {
 		names := listDeps(root)
 		for _, name := range names {

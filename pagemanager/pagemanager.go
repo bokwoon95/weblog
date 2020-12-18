@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strings"
 
 	sq "github.com/bokwoon95/go-structured-query/postgres"
 	"github.com/bokwoon95/weblog/pagemanager/chi"
@@ -71,6 +73,7 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	// Router
 	pm.Router = chi.NewRouter()
 	pm.Router.Use(middleware.Recoverer)
+	pm.Router.Use(SecurityHeaders)
 	pm.Router.Get("/pm-admin", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Welcome to the pagemanager dashboard")
 	})
@@ -267,4 +270,59 @@ func (pm *PageManager) KVPost(w http.ResponseWriter, r *http.Request) {
 		pm.Cache.Set(keyValuePair.Key, keyValuePair.Value, 0)
 	}
 	http.Redirect(w, r, kvdata.RedirectTo, http.StatusMovedPermanently)
+}
+
+func SecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		securityPolicies := []string{
+			`script-src-elem
+				'self'
+				'unsafe-inline'
+				cdn.jsdelivr.net
+				stackpath.bootstrapcdn.com
+				cdn.datatables.net
+				unpkg.com
+				code.jquery.com
+			`,
+			`style-src-elem
+				'self'
+				cdn.jsdelivr.net
+				stackpath.bootstrapcdn.com
+				cdn.datatables.net
+				unpkg.com
+				fonts.googleapis.com
+			`,
+			`style-src 'unsafe-inline'`,
+			`img-src
+				'self'
+				'unsafe-inline'
+				cdn.datatables.net
+				data:
+				source.unsplash.com
+				images.unsplash.com
+			`,
+			`font-src fonts.gstatic.com`,
+			"default-src 'self'",
+			"object-src 'self'",
+			"media-src 'self'",
+			"frame-ancestors 'self'",
+			"connect-src 'self'",
+		}
+		ContentSecurityPolicy := regexp.MustCompile(`\s+`).ReplaceAllString(strings.Join(securityPolicies, "; "), " ")
+		w.Header().Set("Content-Security-Policy", ContentSecurityPolicy)
+		features := []string{
+			`microphone 'none'`,
+			`camera 'none'`,
+			`magnetometer 'none'`,
+			`gyroscope 'none'`,
+		}
+		FeaturePolicy := regexp.MustCompile(`\s+`).ReplaceAllString(strings.Join(features, "; "), " ")
+		w.Header().Set("Feature-Policy", FeaturePolicy)
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+		w.Header().Set("Referrer-Policy", "strict-origin")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "sameorigin")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		next.ServeHTTP(w, r)
+	})
 }
