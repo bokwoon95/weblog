@@ -8,6 +8,26 @@ import (
 	"github.com/oxtoacart/bpool"
 )
 
+type Renderly struct {
+	mu      *sync.RWMutex
+	bufpool *bpool.BufferPool
+	fs      FS
+	funcs   map[string]interface{}
+	opts    []string
+	// plugin
+	html      *template.Template
+	css       map[string][]*Asset
+	js        map[string][]*Asset
+	prehooks  map[string][]Prehook
+	posthooks map[string][]Posthook
+	// fs cache
+	cacheenabled bool
+	cachepage    map[string]Page
+	cachehtml    map[string]*template.Template
+	cachecss     map[string]*Asset
+	cachejs      map[string]*Asset
+}
+
 type Asset struct {
 	Data string
 	Hash [32]byte
@@ -17,47 +37,8 @@ type Prehook func(w http.ResponseWriter, r *http.Request, input interface{}) (ou
 
 type Posthook func(http.ResponseWriter, *http.Request) error
 
-type Render struct {
-	mu      *sync.RWMutex
-	bufpool *bpool.BufferPool
-	// user-provided
-	fs        FS
-	funcs     map[string]interface{}
-	opts      []string
-	prehooks  []Prehook
-	posthooks []Posthook
-	// plugin-provided
-	base            *template.Template
-	plugincss       map[string][]*Asset
-	pluginjs        map[string][]*Asset
-	pluginprehooks  map[string][]Prehook
-	pluginposthooks map[string][]Posthook
-	// cache
-	cacheenabled bool
-	cachepage    map[string]Page
-	cachehtml    map[string]*template.Template
-	cachecss     map[string]*Asset
-	cachejs      map[string]*Asset
-}
-
-type Option func(*Render) error
-
-func TFuncs(funcs map[string]interface{}) Option {
-	return func(rn *Render) error {
-		rn.funcs = funcs
-		return nil
-	}
-}
-
-func TOpts(option ...string) Option {
-	return func(rn *Render) error {
-		rn.opts = option
-		return nil
-	}
-}
-
-func New(fs FS, opts ...Option) (*Render, error) {
-	rn := &Render{
+func New(fs FS, opts ...Option) (*Renderly, error) {
+	rn := &Renderly{
 		fs: fs,
 	}
 	var err error
@@ -70,7 +51,7 @@ func New(fs FS, opts ...Option) (*Render, error) {
 	return rn, nil
 }
 
-func (rn *Render) Page(w http.ResponseWriter, r *http.Request, data interface{}, name string, names ...string) error {
+func (rn *Renderly) Page(w http.ResponseWriter, r *http.Request, data interface{}, name string, names ...string) error {
 	page, err := rn.Lookup(name, names...)
 	if err != nil {
 		return err

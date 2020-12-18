@@ -24,7 +24,7 @@ type Page struct {
 	posthooks []Posthook
 }
 
-func (rn *Render) Lookup(name string, names ...string) (Page, error) {
+func (rn *Renderly) Lookup(name string, names ...string) (Page, error) {
 	fullname := strings.Join(append([]string{name}, names...), "\n")
 	// If page is already cached for the given fullname, return that page and exit
 	if rn.cacheenabled {
@@ -39,11 +39,13 @@ func (rn *Render) Lookup(name string, names ...string) (Page, error) {
 	// Else construct the page from scratch
 	page := Page{
 		bufpool:   rn.bufpool,
-		prehooks:  rn.prehooks,
-		posthooks: rn.posthooks,
+		css:       rn.css[""],       // global css assets
+		js:        rn.js[""],        // global js assets
+		prehooks:  rn.prehooks[""],  // global prehooks
+		posthooks: rn.posthooks[""], // global posthooks
 	}
 	// Clone the page template from the base template
-	page.html, err = rn.base.Clone()
+	page.html, err = rn.html.Clone()
 	if err != nil {
 		return page, err
 	}
@@ -93,22 +95,22 @@ func (rn *Render) Lookup(name string, names ...string) (Page, error) {
 	cssset := make(map[[32]byte]struct{})
 	jsset := make(map[[32]byte]struct{})
 	for _, templateName := range depedencies {
-		for _, asset := range rn.plugincss[templateName] {
+		for _, asset := range rn.css[templateName] {
 			if _, ok := cssset[asset.Hash]; ok {
 				continue
 			}
 			cssset[asset.Hash] = struct{}{}
 			page.css = append(page.css, asset)
 		}
-		for _, asset := range rn.pluginjs[templateName] {
+		for _, asset := range rn.js[templateName] {
 			if _, ok := jsset[asset.Hash]; ok {
 				continue
 			}
 			jsset[asset.Hash] = struct{}{}
 			page.js = append(page.js, asset)
 		}
-		page.prehooks = append(page.prehooks, rn.pluginprehooks[templateName]...)
-		page.posthooks = append(page.posthooks, rn.pluginposthooks[templateName]...)
+		page.prehooks = append(page.prehooks, rn.prehooks[templateName]...)
+		page.posthooks = append(page.posthooks, rn.posthooks[templateName]...)
 	}
 	// Add the user-specified CSS files to the page
 	for _, Name := range CSS {

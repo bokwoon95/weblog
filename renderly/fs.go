@@ -9,7 +9,7 @@ import (
 
 func AbsDir(relativePath string) string {
 	_, absolutePath, _, _ := runtime.Caller(1)
-	return filepath.Join(absolutePath, relativePath)
+	return filepath.Join(absolutePath, relativePath) + string(os.PathSeparator)
 }
 
 // fs.FS

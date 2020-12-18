@@ -6,21 +6,12 @@ libraries define a name struct that maps all their library names to the actual n
 
 allow prerender and postrender hooks to be addable and deleteable separately instead of defining everything at the star.
 
-when vendors are adding their own templates/cssdeps/jsdeps, you can check for naming conflicts and raise an error. This will help with the global namespace situation by letting the user know when a naming conflict occurs.
-
-I think vendor css/js urls can be named after the template they are associated with. If there are consecutive css/js assets associated with a template they can be consecutively numbered.
+vendor css/js urls can be named after the template they are associated with. If there are consecutive css/js assets associated with a template they can be consecutively numbered.
     This will make it easier for the *Render static file server handler to work as well.
     Still haven't figured out how to secure the file server handler to not dump the user's source files if requested. Need some kind of whitelisting/blacklisting.
 
-The way for you to include css/js unconditionally is to add it to the map with the key as an empty string
+change from `name string, names ...string` to `names ...string`. This will make it easier to build abstractions around because
 
-The template to be executed is the first non-css/non-js file provided, not actually the first file. I am not sure if this is a good thing.
-
-- Move the computation of CSS/JS payloads for each solo template to Parse() time (i.e. cached, just like with templates).
-    - https://stackoverflow.com/questions/40584612/how-to-get-a-map-or-list-of-template-actions-from-a-parsed-template
-- Also compute the hash of each CSS/JS payload at Parse() time.
-    {{ range $i, $css := .__wt_css__ }}
-    {{ range $i, $js := .__wt_js__ }}
 - Implement the AddFiles function to include options, maybe at the start? What a radical idea. I have two variadic streams of arguments, filenames and options. How to reconcile the two?
     - option1: do you want an absolute prefix?
     - option2: do you want to include CSS files of the same name?
@@ -39,11 +30,10 @@ The template to be executed is the first non-css/non-js file provided, not actua
     - quite neat! This isn't even blog stuff, it's inherent in pagemanager. You can use this system for any kind of template that targets pagemanager.
 - How does chi's json/markdown renderer reflect on the middleware/handler names? Did it manage to obtain the handler from a route? I need that.
 
-- wt comes with a few map-related helper template functions (that can be optionally disabled by the user)
-    - wt_dict: constructs a new map
-    - wt_dict_add: makes a copy of the first map argument, then adds the subsequent key values to it
-    - wt_dict_cherrypick/filter: makes a copy of the first map argument by only picking the key arguments passed to it
-    - or should I do wt_map_graft instead? wt_map_graft $ (wt_map key1 value1 key2 value2 ...)
+- posthooks should be plain old middlewares! That way you can maximise compatibility by allowing people to put middlewares at the end of a request chain.
+    Or is that too powerful? Should endwares have the power to redirect the user?
+    What even is at the end of a successful endware chain? A no-op handler?
+    Is there even a need for multiple endwares? wtf can they do? What meaningful info can be divined from the w and r post render?
 
 I will eventually have to think about serving assets externally instead of inline. But first I must get the inline implementation working.
 
@@ -52,9 +42,9 @@ long term goals:
 
 pagemanager/pagemanager
 pagemanager/blog
-pagemanager/sq
 pagemanager/erro
-pagemanager/render
-pagemanager/validator
-pagemanager/form
-pagemanager/handlerutil
+pagemanager/sq
+pagemanager/renderly
+pagemanager/vdtr
+pagemanager/former
+pagemanager/sesh
