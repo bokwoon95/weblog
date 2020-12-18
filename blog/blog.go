@@ -21,7 +21,11 @@ func New(namespace string) func(*pagemanager.PageManager) (pagemanager.Plugin, e
 		blg := &Blog{
 			PageManager: manager,
 		}
-		blg.Render, err = renderly.New(os.DirFS(renderly.AbsDir(".")))
+		fsys := os.DirFS(renderly.AbsDir("."))
+		blg.Render, err = renderly.New(
+			fsys,
+			renderly.GlobalCSS(fsys, "tachyons.css"),
+		)
 		if err != nil {
 			return blg, erro.Wrap(err)
 		}
@@ -31,7 +35,7 @@ func New(namespace string) func(*pagemanager.PageManager) (pagemanager.Plugin, e
 
 func (blg *Blog) AddRoutes() error {
 	blg.Router.Get("/blog", func(w http.ResponseWriter, r *http.Request) {
-		err := blg.Render.Page(w, r, nil, "blog.html", "tachyons.css", "blog.js")
+		err := blg.Render.Page(w, r, nil, "blog.html", "blog.js")
 		if err != nil {
 			blg.Render.InternalServerError(w, r, err)
 			return

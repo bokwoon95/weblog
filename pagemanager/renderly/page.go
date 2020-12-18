@@ -1,6 +1,7 @@
 package renderly
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -201,7 +202,55 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 			return err
 		}
 	}
-	// Write Content-Security-Policy style-src-elem
+	if data == nil {
+		data = make(map[string]interface{})
+	}
+	if mapdata, ok := data.(map[string]interface{}); ok {
+		if len(page.css) > 0 {
+			mapdata["__css__"] = page.CSS(w)
+		}
+		if len(page.js) > 0 {
+			mapdata["__js__"] = page.JS(w)
+		}
+		mapdata["__nonce__"], err = page.Nonce(w)
+		if err != nil {
+			return err
+		}
+		// this must be computed -AFTER- making the necessary changes to the
+		// CSP header! So that it will reflect the latest version of CSP.
+		if CSP := w.Header().Get("Content-Security-Policy"); CSP != "" {
+			CSP = r1.ReplaceAllString(CSP, "") // not sure if this is worth doing but ok
+			mapdata["__Content_Security_Policy__"] = template.HTML(fmt.Sprintf(`<meta http-equiv="Content-Security-Policy" content="%s">`, CSP))
+		}
+		data = mapdata
+	}
+	err = executeTemplate(page.html, page.bufpool, w, page.html.Name(), data)
+	if err != nil {
+		return err
+	}
+	for _, fn := range page.posthooks {
+		err = fn(w, r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (page Page) Nonce(w http.ResponseWriter) (template.HTMLAttr, error) {
+	arr := make([]byte, 32)
+	_, err := rand.Read(arr)
+	if err != nil {
+		return "", err
+	}
+	nonce := base64.StdEncoding.EncodeToString(arr)
+	_ = appendCSP(w, "style-src-elem", `'nonce-`+nonce+`'`)
+	_ = appendCSP(w, "script-src-elem", `'nonce-`+nonce+`'`)
+	return template.HTMLAttr(`nonce="` + nonce + `"`), nil
+}
+
+func (page Page) CSS(w http.ResponseWriter) template.HTML {
+	// Generate Content-Security-Policy script-src-elem
 	styles := &strings.Builder{}
 	styleHashes := &strings.Builder{}
 	for i, asset := range page.css {
@@ -217,12 +266,13 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 		styleHashes.WriteString("'")
 	}
 	if styleHashes.Len() > 0 {
-		err = appendCSP(w, "style-src-elem", styleHashes.String())
-		if err != nil {
-			return err
-		}
+		_ = appendCSP(w, "style-src-elem", styleHashes.String())
 	}
-	// Write Content-Security-Policy script-src-elem
+	return template.HTML(styles.String())
+}
+
+func (page Page) JS(w http.ResponseWriter) template.HTML {
+	// Generate Content-Security-Policy script-src-elem
 	scripts := &strings.Builder{}
 	scriptHashes := &strings.Builder{}
 	for i, asset := range page.js {
@@ -238,38 +288,9 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 		scriptHashes.WriteString("'")
 	}
 	if scriptHashes.Len() > 0 {
-		err = appendCSP(w, "script-src-elem", scriptHashes.String())
-		if err != nil {
-			return err
-		}
+		_ = appendCSP(w, "script-src-elem", scriptHashes.String())
 	}
-	if data == nil {
-		data = make(map[string]interface{})
-	}
-	if mapdata, ok := data.(map[string]interface{}); ok {
-		if CSP := w.Header().Get("Content-Security-Policy"); CSP != "" {
-			CSP = r1.ReplaceAllString(CSP, "") // not sure if this is worth doing but ok
-			mapdata["__Content_Security_Policy__"] = template.HTML(fmt.Sprintf(`<meta http-equiv="Content-Security-Policy" content="%s">`, CSP))
-		}
-		if styles.Len() > 0 {
-			mapdata["__css__"] = template.HTML(styles.String())
-		}
-		if scripts.Len() > 0 {
-			mapdata["__js__"] = template.HTML(scripts.String())
-		}
-		data = mapdata
-	}
-	err = executeTemplate(page.html, page.bufpool, w, page.html.Name(), data)
-	if err != nil {
-		return err
-	}
-	for _, fn := range page.posthooks {
-		err = fn(w, r)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return template.HTML(scripts.String())
 }
 
 func listAllDeps(t *template.Template, name string) ([]string, error) {
