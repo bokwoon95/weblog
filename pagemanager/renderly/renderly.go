@@ -73,8 +73,8 @@ func New(fs fs.FS, opts ...Option) (*Renderly, error) {
 	return ry, nil
 }
 
-func (ry *Renderly) Page(w http.ResponseWriter, r *http.Request, data interface{}, name string, names ...string) error {
-	page, err := ry.Lookup(name, names...)
+func (ry *Renderly) Page(w http.ResponseWriter, r *http.Request, data interface{}, names ...string) error {
+	page, err := ry.Lookup(names...)
 	if err != nil {
 		return erro.Wrap(err)
 	}
@@ -116,9 +116,9 @@ func TemplateOpts(option ...string) Option {
 	}
 }
 
-func GlobalCSS(fsys fs.FS, name string, names ...string) Option {
+func GlobalCSS(fsys fs.FS, names ...string) Option {
 	return func(ry *Renderly) error {
-		for _, name := range append([]string{name}, names...) {
+		for _, name := range names {
 			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return err
@@ -132,9 +132,9 @@ func GlobalCSS(fsys fs.FS, name string, names ...string) Option {
 	}
 }
 
-func GlobalJS(fsys fs.FS, name string, names ...string) Option {
+func GlobalJS(fsys fs.FS, names ...string) Option {
 	return func(ry *Renderly) error {
-		for _, name := range append([]string{name}, names...) {
+		for _, name := range names {
 			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return err
@@ -148,20 +148,24 @@ func GlobalJS(fsys fs.FS, name string, names ...string) Option {
 	}
 }
 
-func GlobalTemplates(fsys fs.FS, name string, names ...string) Option {
+func GlobalTemplates(fsys fs.FS, names ...string) Option {
 	return func(ry *Renderly) error {
 		if ry.html == nil {
 			ry.html = template.New("")
 		}
-		for _, name := range append([]string{name}, names...) {
+		for _, name := range names {
 			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return err
 			}
-			ry.js[""] = append(ry.js[""], &Asset{
-				Data: string(b),
-				Hash: sha256.Sum256(b),
-			})
+			t, err := template.New(name).Funcs(ry.funcs).Option(ry.opts...).Parse(string(b))
+			if err != nil {
+				return err
+			}
+			err = addParseTree(ry.html, t, t.Name())
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	}

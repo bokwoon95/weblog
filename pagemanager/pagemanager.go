@@ -277,7 +277,6 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		securityPolicies := []string{
 			`script-src-elem
 				'self'
-				'unsafe-inline'
 				cdn.jsdelivr.net
 				stackpath.bootstrapcdn.com
 				cdn.datatables.net
@@ -292,10 +291,8 @@ func SecurityHeaders(next http.Handler) http.Handler {
 				unpkg.com
 				fonts.googleapis.com
 			`,
-			`style-src 'unsafe-inline'`,
 			`img-src
 				'self'
-				'unsafe-inline'
 				cdn.datatables.net
 				data:
 				source.unsplash.com

@@ -27,8 +27,11 @@ type Page struct {
 	posthooks []Posthook
 }
 
-func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
-	fullname := strings.Join(append([]string{name}, names...), "\n")
+func (ry *Renderly) Lookup(names ...string) (Page, error) {
+	if len(names) == 0 {
+		return Page{}, fmt.Errorf("no files were passed in")
+	}
+	fullname := strings.Join(names, "\n")
 	// If page is already cached for the given fullname, return that page and exit
 	if ry.cacheenabled {
 		ry.mu.RLock()
@@ -53,7 +56,10 @@ func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 		return page, err
 	}
 	page.html = page.html.Option(ry.opts...)
-	HTML, CSS, JS := categorize(append([]string{name}, names...))
+	HTML, CSS, JS := categorize(names)
+	if len(HTML) == 0 {
+		return Page{}, fmt.Errorf("no html files were passed in")
+	}
 	// Add user-specified HTML templates to the page template
 	for _, Name := range HTML {
 		var t *template.Template
@@ -86,8 +92,12 @@ func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 			return page, err
 		}
 	}
-	// Find the list of dependency templates invoked by the `name` template
-	depedencies, err := listAllDeps(page.html, name)
+	page.html = page.html.Lookup(HTML[0])
+	if page.html == nil {
+		return page, erro.Wrap(fmt.Errorf(`no templated found for name "%s"`, HTML[0]))
+	}
+	// Find the list of dependency templates invoked by the first HTML template
+	depedencies, err := listAllDeps(page.html, HTML[0])
 	if err != nil {
 		return page, err
 	}
@@ -179,10 +189,6 @@ func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 			page.js = append(page.js, asset)
 		}
 	}
-	page.html = page.html.Lookup(name)
-	if page.html == nil {
-		return page, erro.Wrap(fmt.Errorf(`no templated found for name "%s"`, name))
-	}
 	// Cache the page if the user enabled it
 	if ry.cacheenabled {
 		ry.mu.Lock()
@@ -195,6 +201,9 @@ func (ry *Renderly) Lookup(name string, names ...string) (Page, error) {
 var r1 = regexp.MustCompile(`(?:;|^)\s*(?:frame-ancestors|report-uri|sandbox)[^;]*\s*`)
 
 func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}) error {
+	if page.bufpool == nil || page.html == nil {
+		return fmt.Errorf("tried to render an empty page")
+	}
 	var err error
 	for _, fn := range page.prehooks {
 		data, err = fn(w, r, data)
@@ -262,7 +271,7 @@ func (page Page) CSS(w http.ResponseWriter) template.HTML {
 		styleHashes.WriteString("'")
 	}
 	if styleHashes.Len() > 0 {
-		_ = appendCSP(w, "style-src-elem", styleHashes.String())
+		_ = appendCSP(w, "style-src", styleHashes.String())
 	}
 	return template.HTML(styles.String())
 }
@@ -284,7 +293,7 @@ func (page Page) JS(w http.ResponseWriter) template.HTML {
 		scriptHashes.WriteString("'")
 	}
 	if scriptHashes.Len() > 0 {
-		_ = appendCSP(w, "script-src-elem", scriptHashes.String())
+		_ = appendCSP(w, "script-src", scriptHashes.String())
 	}
 	return template.HTML(scripts.String())
 }
