@@ -42,9 +42,9 @@ type Asset struct {
 	Hash [32]byte
 }
 
-type Prehook func(w http.ResponseWriter, r *http.Request, input interface{}) (output interface{}, err error)
+type Prehook func(w io.Writer, r *http.Request, input interface{}) (output interface{}, err error)
 
-type Posthook func(http.ResponseWriter, *http.Request) error
+type Posthook func(io.Writer, *http.Request) error
 
 func New(fs fs.FS, opts ...Option) (*Renderly, error) {
 	ry := &Renderly{
@@ -73,8 +73,8 @@ func New(fs fs.FS, opts ...Option) (*Renderly, error) {
 	return ry, nil
 }
 
-func (ry *Renderly) Page(w http.ResponseWriter, r *http.Request, data interface{}, names ...string) error {
-	page, err := ry.Lookup(names...)
+func (ry *Renderly) Page(w http.ResponseWriter, r *http.Request, data interface{}, filenames ...string) error {
+	page, err := ry.Lookup(filenames...)
 	if err != nil {
 		return erro.Wrap(err)
 	}
@@ -116,9 +116,9 @@ func TemplateOpts(option ...string) Option {
 	}
 }
 
-func GlobalCSS(fsys fs.FS, names ...string) Option {
+func GlobalCSS(fsys fs.FS, filenames ...string) Option {
 	return func(ry *Renderly) error {
-		for _, name := range names {
+		for _, name := range filenames {
 			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return err
@@ -132,9 +132,9 @@ func GlobalCSS(fsys fs.FS, names ...string) Option {
 	}
 }
 
-func GlobalJS(fsys fs.FS, names ...string) Option {
+func GlobalJS(fsys fs.FS, filenames ...string) Option {
 	return func(ry *Renderly) error {
-		for _, name := range names {
+		for _, name := range filenames {
 			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return err
@@ -148,12 +148,12 @@ func GlobalJS(fsys fs.FS, names ...string) Option {
 	}
 }
 
-func GlobalTemplates(fsys fs.FS, names ...string) Option {
+func GlobalTemplates(fsys fs.FS, filenames ...string) Option {
 	return func(ry *Renderly) error {
 		if ry.html == nil {
 			ry.html = template.New("")
 		}
-		for _, name := range names {
+		for _, name := range filenames {
 			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return err

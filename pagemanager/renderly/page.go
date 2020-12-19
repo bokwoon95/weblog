@@ -27,11 +27,11 @@ type Page struct {
 	posthooks []Posthook
 }
 
-func (ry *Renderly) Lookup(names ...string) (Page, error) {
-	if len(names) == 0 {
+func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
+	if len(filenames) == 0 {
 		return Page{}, fmt.Errorf("no files were passed in")
 	}
-	fullname := strings.Join(names, "\n")
+	fullname := strings.Join(filenames, "\n")
 	// If page is already cached for the given fullname, return that page and exit
 	if ry.cacheenabled {
 		ry.mu.RLock()
@@ -56,33 +56,33 @@ func (ry *Renderly) Lookup(names ...string) (Page, error) {
 		return page, err
 	}
 	page.html = page.html.Option(ry.opts...)
-	HTML, CSS, JS := categorize(names)
+	HTML, CSS, JS := categorize(filenames)
 	if len(HTML) == 0 {
 		return Page{}, fmt.Errorf("no html files were passed in")
 	}
 	// Add user-specified HTML templates to the page template
-	for _, Name := range HTML {
+	for _, filename := range HTML {
 		var t *template.Template
 		// If the template is already cached for the given file Name, use that template
 		if ry.cacheenabled {
 			ry.mu.RLock()
-			t = ry.cachehtml[Name]
+			t = ry.cachehtml[filename]
 			ry.mu.RUnlock()
 		}
 		// Else construct the template from scratch
 		if t == nil {
-			b, err := fs.ReadFile(ry.fs, Name)
+			b, err := fs.ReadFile(ry.fs, filename)
 			if err != nil {
 				return page, err
 			}
-			t, err = template.New(Name).Funcs(ry.funcs).Option(ry.opts...).Parse(string(b))
+			t, err = template.New(filename).Funcs(ry.funcs).Option(ry.opts...).Parse(string(b))
 			if err != nil {
 				return page, err
 			}
 			// Cache the template if the user enabled it
 			if ry.cacheenabled {
 				ry.mu.Lock()
-				ry.cachehtml[Name] = t
+				ry.cachehtml[filename] = t
 				ry.mu.Unlock()
 			}
 		}
@@ -200,7 +200,7 @@ func (ry *Renderly) Lookup(names ...string) (Page, error) {
 
 var r1 = regexp.MustCompile(`(?:;|^)\s*(?:frame-ancestors|report-uri|sandbox)[^;]*\s*`)
 
-func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}) error {
+func (page Page) Render(w io.Writer, r *http.Request, data interface{}) error {
 	if page.bufpool == nil || page.html == nil {
 		return fmt.Errorf("tried to render an empty page")
 	}
@@ -221,11 +221,15 @@ func (page Page) Render(w http.ResponseWriter, r *http.Request, data interface{}
 		if len(page.js) > 0 {
 			mapdata["__js__"] = page.JS(w)
 		}
-		// this must be computed -AFTER- making the necessary changes to the
-		// CSP header! So that it will reflect the latest version of CSP.
-		if CSP := w.Header().Get("Content-Security-Policy"); CSP != "" {
-			CSP = r1.ReplaceAllString(CSP, "") // not sure if this is worth doing but ok
-			mapdata["__Content_Security_Policy__"] = template.HTML(fmt.Sprintf(`<meta http-equiv="Content-Security-Policy" content="%s">`, CSP))
+		if w, ok := w.(http.ResponseWriter); ok {
+			// this must be computed -AFTER- making the necessary changes to the
+			// CSP header! So that it will reflect the latest version of CSP.
+			if CSP := w.Header().Get("Content-Security-Policy"); CSP != "" {
+				CSP = r1.ReplaceAllString(CSP, "") // not sure if this is worth doing but ok
+				mapdata["__Content_Security_Policy__"] = template.HTML(fmt.Sprintf(`<meta http-equiv="Content-Security-Policy" content="%s">`, CSP))
+			}
+		} else {
+			mapdata["__Content_Security_Policy__"] = template.HTML(`<meta http-equiv="Content-Security-Policy" content="">`)
 		}
 		data = mapdata
 	}
@@ -254,7 +258,7 @@ func (page Page) Nonce(w http.ResponseWriter) (template.HTMLAttr, error) {
 	return template.HTMLAttr(`nonce="` + nonce + `"`), nil
 }
 
-func (page Page) CSS(w http.ResponseWriter) template.HTML {
+func (page Page) CSS(w io.Writer) template.HTML {
 	// Generate Content-Security-Policy script-src
 	styles := &strings.Builder{}
 	styleHashes := &strings.Builder{}
@@ -271,12 +275,14 @@ func (page Page) CSS(w http.ResponseWriter) template.HTML {
 		styleHashes.WriteString("'")
 	}
 	if styleHashes.Len() > 0 {
-		_ = appendCSP(w, "style-src", styleHashes.String())
+		if w, ok := w.(http.ResponseWriter); ok {
+			_ = appendCSP(w, "style-src", styleHashes.String())
+		}
 	}
 	return template.HTML(styles.String())
 }
 
-func (page Page) JS(w http.ResponseWriter) template.HTML {
+func (page Page) JS(w io.Writer) template.HTML {
 	// Generate Content-Security-Policy script-src
 	scripts := &strings.Builder{}
 	scriptHashes := &strings.Builder{}
@@ -293,7 +299,9 @@ func (page Page) JS(w http.ResponseWriter) template.HTML {
 		scriptHashes.WriteString("'")
 	}
 	if scriptHashes.Len() > 0 {
-		_ = appendCSP(w, "script-src", scriptHashes.String())
+		if w, ok := w.(http.ResponseWriter); ok {
+			_ = appendCSP(w, "script-src", scriptHashes.String())
+		}
 	}
 	return template.HTML(scripts.String())
 }
