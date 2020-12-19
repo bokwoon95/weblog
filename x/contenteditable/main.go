@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/bokwoon95/weblog/pagemanager"
+	"github.com/bokwoon95/weblog/pagemanager/renderly"
 )
 
 var (
@@ -46,4 +48,32 @@ func main() {
 			log.Fatalf("srv.ListenAndServe error: %v\n", err)
 		}
 	}
+}
+
+type Server struct {
+	*pagemanager.PageManager
+	Render *renderly.Renderly
+}
+
+func New(pm *pagemanager.PageManager) (pagemanager.Plugin, error) {
+	plugin := &Server{
+		PageManager: pm,
+	}
+	var err error
+	fsys := os.DirFS(renderly.AbsDir("."))
+	plugin.Render, err = renderly.New(fsys)
+	if err != nil {
+		return plugin, err
+	}
+	return plugin, nil
+}
+
+func (srv *Server) AddRoutes() error {
+	srv.Router.Get("/", srv.User)
+	srv.Router.Post("/preview", srv.User)
+	return nil
+}
+
+func (srv *Server) User(w http.ResponseWriter, r *http.Request) {
+	srv.Render.Page(w, r, nil, "tachyons.css", "main.html", "main.css", "main.js")
 }

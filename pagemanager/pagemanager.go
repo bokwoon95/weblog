@@ -12,6 +12,7 @@ import (
 	sq "github.com/bokwoon95/go-structured-query/postgres"
 	"github.com/bokwoon95/weblog/pagemanager/chi"
 	"github.com/bokwoon95/weblog/pagemanager/chi/middleware"
+	"github.com/bokwoon95/weblog/pagemanager/docgen"
 	"github.com/dgraph-io/ristretto"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/microcosm-cc/bluemonday"
@@ -74,6 +75,9 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	pm.Router = chi.NewRouter()
 	pm.Router.Use(middleware.Recoverer)
 	pm.Router.Use(SecurityHeaders)
+	pm.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, docgen.JSONRoutesDoc(pm.Router))
+	})
 	pm.Router.Get("/pm-admin", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Welcome to the pagemanager dashboard")
 	})

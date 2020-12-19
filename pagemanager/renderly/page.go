@@ -255,7 +255,7 @@ func (page Page) Nonce(w http.ResponseWriter) (template.HTMLAttr, error) {
 }
 
 func (page Page) CSS(w http.ResponseWriter) template.HTML {
-	// Generate Content-Security-Policy script-src-elem
+	// Generate Content-Security-Policy script-src
 	styles := &strings.Builder{}
 	styleHashes := &strings.Builder{}
 	for i, asset := range page.css {
@@ -277,7 +277,7 @@ func (page Page) CSS(w http.ResponseWriter) template.HTML {
 }
 
 func (page Page) JS(w http.ResponseWriter) template.HTML {
-	// Generate Content-Security-Policy script-src-elem
+	// Generate Content-Security-Policy script-src
 	scripts := &strings.Builder{}
 	scriptHashes := &strings.Builder{}
 	for i, asset := range page.js {

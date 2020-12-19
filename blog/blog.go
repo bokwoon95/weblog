@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/bokwoon95/weblog/pagemanager"
+	"github.com/bokwoon95/weblog/pagemanager/chi"
 	"github.com/bokwoon95/weblog/pagemanager/erro"
 	"github.com/bokwoon95/weblog/pagemanager/renderly"
 )
@@ -34,12 +35,14 @@ func New(namespace string) func(*pagemanager.PageManager) (pagemanager.Plugin, e
 }
 
 func (blg *Blog) AddRoutes() error {
-	blg.Router.Get("/blog", func(w http.ResponseWriter, r *http.Request) {
-		err := blg.Render.Page(w, r, nil, "blog.html", "blog.js")
-		if err != nil {
-			blg.Render.InternalServerError(w, r, err)
-			return
-		}
+	blg.Router.Route("/blog", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			err := blg.Render.Page(w, r, nil, "blog.html", "blog.js")
+			if err != nil {
+				blg.Render.InternalServerError(w, r, err)
+				return
+			}
+		})
 	})
 	return nil
 }

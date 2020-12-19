@@ -2,23 +2,23 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/bokwoon95/weblog/pagemanager/chi"
-	"github.com/bokwoon95/weblog/pagemanager/templat"
+	"github.com/bokwoon95/weblog/pagemanager/renderly"
 )
 
 var (
 	_, sourcefile, _, _ = runtime.Caller(0)
 	sourcedir           = filepath.Dir(sourcefile)
 )
-
-var templates *templat.Templates
 
 const lipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque auctor aliquam elit a iaculis. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas enim diam, scelerisque sed magna vitae, iaculis ornare eros. Suspendisse placerat mollis dolor. Donec non convallis justo. Cras et enim neque. Fusce mattis lacinia turpis vitae sollicitudin. Praesent a leo quis dui aliquam blandit sit amet ut felis."
 
@@ -77,33 +77,25 @@ var funcs = map[string]interface{}{
 }
 
 func main() {
-	var err error
-	common := []string{
-		sourcedir + "/common.html",
-	}
+	fsys := os.DirFS(renderly.AbsDir("."))
+	var opts []renderly.Option
 	if true {
-		common = append(common, sourcedir+"/index_post_summary.html")
-		common = append(common, sourcedir+"/pagination_none.html")
+		opts = append(opts, renderly.GlobalTemplates(fsys, "index_post_summary.html", "pagination_none.html"))
 	} else {
-		common = append(common, sourcedir+"/index_post_body.html")
-		common = append(common, sourcedir+"/pagination_yes.html")
+		opts = append(opts, renderly.GlobalTemplates(fsys, "index_post_body.html", "pagination_yes.html"))
 	}
-	templates, err = templat.Parse(common, []string{
-		sourcedir + "/index.html",
-		sourcedir + "/post.html",
-	}, templat.Funcs(funcs))
+	render, err := renderly.New(fsys, opts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println(templates.DefinedTemplates())
 	r := chi.NewRouter()
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]interface{}{
 			"posts": posts,
 		}
-		err := templates.Render(w, r, data, sourcedir+"/index.html")
+		err := render.Page(w, r, data, "index.html")
 		if err != nil {
-			log.Fatalln(err)
+			io.WriteString(w, err.Error())
 		}
 	})
 	FileServer(r, "/static", http.Dir(sourcedir))

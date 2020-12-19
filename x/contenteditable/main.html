@@ -2,31 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css">
-  <style>
-    html {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Oxygen, Cantarell, sans-serif;
-    }
-    .hero-banner {
-      width: 100vw;
-      height: 400px;
-      background-image: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(https://source.unsplash.com/rnAsJ38qio8/1200x600);
-      background-size: cover;
-      background-repeat: no-repeat;
-      background-attachment: local;
-    }
-    .text-border {
-      text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black;
-    }
-    .contenteditable-global {
-      border-style: dotted;
-      background-color: rgba(51, 170, 51, .4);
-    }
-    .contenteditable-local {
-      border-style: dotted;
-      background-color: rgba(240, 255, 0, 0.4);
-    }
-  </style>
+  {{ .__css__ }}
   <title></title>
 </head>
 <body>
@@ -70,34 +46,7 @@
 <div class="flex justify-center mt5">
   <div>Copyright © 2020 <span id="contenteditable:name" class="contenteditable-global">Robert Table</span>. All rights reserved.</div>
 </div>
+{{ .__js__ }}
 </body>
-<script>
-  document.addEventListener("DOMContentLoaded", function() {
-    const globals = document.querySelectorAll(".contenteditable-global");
-    for (element of globals) {
-      element.setAttribute("contenteditable", "true");
-    }
-    const saveBtn = document.querySelector("#save");
-    if (saveBtn) {
-      saveBtn.addEventListener("click", async function(e) {
-        let keyValuePairs = [];
-        for (element of globals) {
-          keyValuePairs.push({ key: element.getAttribute("id"), value: element.innerHTML });
-        }
-        try {
-          const resp = await fetch('/pm-kv', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key_value_pairs: keyValuePairs, redirect_to: window.location.pathname, }),
-          });
-          const text = await resp.text();
-          console.log(text);
-        } catch(err) {
-          console.log(err);
-        }
-      });
-    }
-  });
-</script>
 </html>
 
