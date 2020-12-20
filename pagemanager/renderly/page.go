@@ -26,6 +26,7 @@ type Page struct {
 	js        []*Asset
 	prehooks  []Prehook
 	posthooks []Posthook
+	config    map[string]string
 }
 
 func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
@@ -73,17 +74,26 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		// Else construct the template from scratch
 		if t == nil {
 			fsys := ry.fs
-			if i := strings.IndexRune(filename, '?'); i > 0 {
+			name := filename
+			i := strings.IndexRune(filename, '?')
+			if i > 0 {
+				name = filename[:i]
 				query, _ := url.ParseQuery(filename[i+1:])
-				altfs := ry.altfs[query.Get("fs")]
-				if altfs != nil {
+				fsName := query.Get("fs")
+				altfs := ry.altfs[fsName]
+				if fsName != "" && altfs != nil {
 					fsys = altfs
 				}
 			}
-			if name, err := url.QueryUnescape(filename); err != nil {
-				filename = name
+			name, err := url.QueryUnescape(name)
+			if err != nil {
+				if i > 0 {
+					name = filename[:i]
+				} else {
+					name = filename
+				}
 			}
-			b, err := fs.ReadFile(fsys, filename)
+			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return page, err
 			}
@@ -149,17 +159,26 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		// Else construct the CSS asset from scratch
 		if asset == nil {
 			fsys := ry.fs
-			if i := strings.IndexRune(filename, '?'); i > 0 {
+			name := filename
+			i := strings.IndexRune(filename, '?')
+			if i > 0 {
+				name = filename[:i]
 				query, _ := url.ParseQuery(filename[i+1:])
-				altfs := ry.altfs[query.Get("fs")]
-				if altfs != nil {
+				fsName := query.Get("fs")
+				altfs := ry.altfs[fsName]
+				if fsName != "" && altfs != nil {
 					fsys = altfs
 				}
 			}
-			if name, err := url.QueryUnescape(filename); err != nil {
-				filename = name
+			name, err := url.QueryUnescape(name)
+			if err != nil {
+				if i > 0 {
+					name = filename[:i]
+				} else {
+					name = filename
+				}
 			}
-			b, err := fs.ReadFile(fsys, filename)
+			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return page, err
 			}
@@ -192,17 +211,26 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		// Else construct the JS asset from scratch
 		if asset == nil {
 			fsys := ry.fs
-			if i := strings.IndexRune(filename, '?'); i > 0 {
+			name := filename
+			i := strings.IndexRune(filename, '?')
+			if i > 0 {
+				name = filename[:i]
 				query, _ := url.ParseQuery(filename[i+1:])
-				altfs := ry.altfs[query.Get("fs")]
-				if altfs != nil {
+				fsName := query.Get("fs")
+				altfs := ry.altfs[fsName]
+				if fsName != "" && altfs != nil {
 					fsys = altfs
 				}
 			}
-			if name, err := url.QueryUnescape(filename); err != nil {
-				filename = name
+			name, err := url.QueryUnescape(name)
+			if err != nil {
+				if i > 0 {
+					name = filename[:i]
+				} else {
+					name = filename
+				}
 			}
-			b, err := fs.ReadFile(fsys, filename)
+			b, err := fs.ReadFile(fsys, name)
 			if err != nil {
 				return page, err
 			}

@@ -1,0 +1,16 @@
+author = "Chua Bok Woon"
+
+[[pages]]
+html = "post.html"
+css = ["style.css"]
+js = []
+target = "pagemanager/blog/post.html"
+[pages.data]
+summary = "true"
+
+[[pages]]
+html = "post-index.html"
+css = ["style.css"]
+js = []
+[pages.data]
+ich = "nee"

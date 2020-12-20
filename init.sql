@@ -8,7 +8,6 @@ DROP TABLE IF EXISTS blg_posts;
 DROP TABLE IF EXISTS blg_config;
 -- pm
 DROP TABLE IF EXISTS pm_routes;
-DROP TABLE IF EXISTS pm_templates;
 DROP TABLE IF EXISTS pm_users;
 DROP TABLE IF EXISTS pm_kv;
 
@@ -20,15 +19,6 @@ CREATE TABLE pm_kv (
 
 CREATE TABLE pm_users (
     user_id BIGINT NOT NULL PRIMARY KEY
-);
-
-CREATE TABLE pm_templates (
-    template_id BIGINT NOT NULL PRIMARY KEY
-    ,plugin TEXT
-    ,name TEXT
-    ,template_name TEXT
-    ,template_body TEXT
-    ,template_gob BYTEA
 );
 
 CREATE TABLE pm_routes (

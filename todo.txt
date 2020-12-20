@@ -1,0 +1,19 @@
+usually pagemanager/blog renders
+
+render.Page(w, r, data, "post-index.html", "post-index.css", "post-index.js")
+
+but before that, it will check the blg_kv table
+
+blg_kv:
+    post-index.html -> post-index.html?fs=templates&dir=plainsimple
+    post.html -> post.html?fs=templates&dir=plainsimple
+
+note: pagemanager/blog was the one who registered the templates/ directory under as the 'templates' alt FS. so if it sets ?fs=templates, it's guaranteed that the templatesFS exists because it was the one that registered it
+
+anyway pagemanager/blog will look into the plainsimple/ directory (inside the templates/ directory) and find the config.toml. it feeds "post-index.html" as the key and gets back css = ["style.css"], js = ["post-index.js"], data = { summary = "true", some_other_setting = "lorem ipsum" }.
+
+So instead it calls
+
+render.Page(w, r, data, "post-index.html?fs=templates", "style.css?fs=templates", "post-index.js?fs=templates")
+
+and renderly should search for those files accordingly in templatesFS. Also pagemanager/blog got the data = { summary = "true", some_other_setting = "lorem ipsum" }, it uses that to influence the decisions it makes when it comes to injecting the data into the template, like whether it should provide just the post {{ .Summary }} or the entire post {{ .Body }}.

@@ -16,7 +16,7 @@ const port = ":80"
 
 func main() {
 	for {
-		pm, err := pagemanager.New("sqlite3", "./weblog.sqlite3")
+		pm, err := pagemanager.New("sqlite3", "./database.sqlite3")
 		if err != nil {
 			log.Fatalln(err)
 		}
