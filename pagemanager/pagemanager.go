@@ -74,6 +74,7 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	// Router
 	pm.Router = chi.NewRouter()
 	pm.Router.Use(middleware.Recoverer)
+	pm.Router.Use(pm.pm_routes)
 	pm.Router.Use(SecurityHeaders)
 	pm.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, docgen.JSONRoutesDoc(pm.Router))
@@ -128,6 +129,14 @@ func (pm *PageManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// handler_url cached?
 	if value, ok := pm.Cache.Get(handlerKey + r.URL.Path); ok {
 		if handlerURL, ok := value.(string); ok {
+			// rctx := chi.RouteContext(r.Context())
+			// if pm.Router.Match(chi.NewRouteContext(), "GET", handlerURL) {
+			// 	rctx.RoutePath = handlerURL
+			// 	pm.Router.ServeHTTP(w, r)
+			// 	return
+			// } else {
+			// 	pm.Cache.Del(handlerKey + r.URL.Path)
+			// }
 			handler := lookupHandler(pm.Router, handlerURL)
 			if handler != nil {
 				handler.ServeHTTP(w, r)
@@ -170,6 +179,12 @@ func (pm *PageManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if handlerURL.String != "" {
+		// rctx := chi.RouteContext(r.Context())
+		// if pm.Router.Match(chi.NewRouteContext(), "GET", handlerURL.String) {
+		// 	rctx.RoutePath = handlerURL.String
+		// 	pm.Router.ServeHTTP(w, r)
+		// 	return
+		// }
 		handler := lookupHandler(pm.Router, handlerURL.String)
 		if handler != nil {
 			pm.Cache.Set(handlerKey+r.URL.Path, handlerURL.String, 0)
@@ -178,6 +193,109 @@ func (pm *PageManager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	pm.Router.ServeHTTP(w, r)
+}
+
+func (pm *PageManager) pm_routes(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if value, ok := pm.Cache.Get(disabledKey + r.URL.Path); ok {
+			if disabled, ok := value.(bool); ok {
+				if disabled {
+					pm.Router.NotFoundHandler().ServeHTTP(w, r)
+					return
+				}
+			} else {
+				pm.Cache.Del(disabledKey + r.URL.Path)
+			}
+		}
+		// page cached?
+		if value, ok := pm.Cache.Get(pageKey + r.URL.Path); ok {
+			if page, ok := value.(string); ok {
+				fmt.Println("serving page", r.URL, "from cache")
+				io.WriteString(w, page)
+				return
+			} else {
+				pm.Cache.Del(pageKey + r.URL.Path)
+			}
+		}
+		// redirect_url cached?
+		if value, ok := pm.Cache.Get(redirectKey + r.URL.Path); ok {
+			if redirectURL, ok := value.(string); ok {
+				if redirectURL != "" {
+					http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
+					return
+				}
+			} else {
+				pm.Cache.Del(redirectKey + r.URL.Path)
+			}
+		}
+		// handler_url cached?
+		if value, ok := pm.Cache.Get(handlerKey + r.URL.Path); ok {
+			if handlerURL, ok := value.(string); ok {
+				rctx := chi.RouteContext(r.Context())
+				if pm.Router.Match(chi.NewRouteContext(), "GET", handlerURL) {
+					rctx.RoutePath = handlerURL
+					next.ServeHTTP(w, r)
+					return
+				} else {
+					pm.Cache.Del(handlerKey + r.URL.Path)
+				}
+				// handler := lookupHandler(pm.Router, handlerURL)
+				// if handler != nil {
+				// 	handler.ServeHTTP(w, r)
+				// 	return
+				// } else {
+				// 	pm.Cache.Del(handlerKey + r.URL.Path)
+				// }
+			} else {
+				pm.Cache.Del(handlerKey + r.URL.Path)
+			}
+		}
+		var disabled sql.NullBool
+		var page, redirectURL, handlerURL sql.NullString
+		err := pm.DB.
+			QueryRow("SELECT disabled, page, redirect_url, handler_url FROM pm_routes WHERE url = ?", r.URL.Path).
+			Scan(&disabled, &page, &redirectURL, &handlerURL)
+		if errors.Is(err, sql.ErrNoRows) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if err != nil {
+			io.WriteString(w, err.Error())
+			return
+		}
+		if disabled.Bool {
+			pm.Cache.Set(disabledKey+r.URL.Path, disabled.Bool, 0)
+			pm.Router.NotFoundHandler().ServeHTTP(w, r)
+			return
+		}
+		if page.String != "" {
+			pm.Cache.Set(pageKey+r.URL.Path, page.String, 0)
+			io.WriteString(w, page.String)
+			return
+		}
+		if redirectURL.String != "" {
+			pm.Cache.Set(handlerKey+r.URL.Path, redirectURL.String, 0)
+			if redirectURL.String != "" {
+				http.Redirect(w, r, redirectURL.String, http.StatusMovedPermanently)
+				return
+			}
+		}
+		if handlerURL.String != "" {
+			rctx := chi.RouteContext(r.Context())
+			if pm.Router.Match(chi.NewRouteContext(), "GET", handlerURL.String) {
+				rctx.RoutePath = handlerURL.String
+				next.ServeHTTP(w, r)
+				return
+			}
+			// handler := lookupHandler(pm.Router, handlerURL.String)
+			// if handler != nil {
+			// 	pm.Cache.Set(handlerKey+r.URL.Path, handlerURL.String, 0)
+			// 	handler.ServeHTTP(w, r)
+			// 	return
+			// }
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func lookupHandler(mux *chi.Mux, path string) http.Handler {

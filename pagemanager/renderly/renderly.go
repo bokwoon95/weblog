@@ -19,6 +19,7 @@ type Renderly struct {
 	mu      *sync.RWMutex
 	bufpool *bpool.BufferPool
 	fs      fs.FS
+	altfs   map[string]fs.FS
 	funcs   map[string]interface{}
 	opts    []string
 	// plugin
@@ -38,17 +39,19 @@ type Renderly struct {
 }
 
 type Asset struct {
-	Data string
-	Hash [32]byte
+	Data     string
+	Hash     [32]byte
+	External bool
 }
 
 type Prehook func(w io.Writer, r *http.Request, input interface{}) (output interface{}, err error)
 
 type Posthook func(io.Writer, *http.Request) error
 
-func New(fs fs.FS, opts ...Option) (*Renderly, error) {
+func New(fsys fs.FS, opts ...Option) (*Renderly, error) {
 	ry := &Renderly{
-		fs:      fs,
+		fs:      fsys,
+		altfs:   make(map[string]fs.FS),
 		bufpool: bpool.NewBufferPool(64),
 		funcs:   make(map[string]interface{}),
 		// plugin
@@ -167,6 +170,13 @@ func GlobalTemplates(fsys fs.FS, filenames ...string) Option {
 				return err
 			}
 		}
+		return nil
+	}
+}
+
+func AltFS(name string, fsys fs.FS) Option {
+	return func(ry *Renderly) error {
+		ry.altfs[name] = fsys
 		return nil
 	}
 }

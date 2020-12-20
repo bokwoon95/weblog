@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -71,7 +72,18 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		}
 		// Else construct the template from scratch
 		if t == nil {
-			b, err := fs.ReadFile(ry.fs, filename)
+			fsys := ry.fs
+			if i := strings.IndexRune(filename, '?'); i > 0 {
+				query, _ := url.ParseQuery(filename[i+1:])
+				altfs := ry.altfs[query.Get("fs")]
+				if altfs != nil {
+					fsys = altfs
+				}
+			}
+			if name, err := url.QueryUnescape(filename); err != nil {
+				filename = name
+			}
+			b, err := fs.ReadFile(fsys, filename)
 			if err != nil {
 				return page, err
 			}
@@ -126,17 +138,28 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		page.posthooks = append(page.posthooks, ry.posthooks[templateName]...)
 	}
 	// Add the user-specified CSS files to the page
-	for _, Name := range CSS {
+	for _, filename := range CSS {
 		var asset *Asset
 		// If CSS asset is already cached for the given file name, use that asset
 		if ry.cacheenabled {
 			ry.mu.RLock()
-			asset = ry.cachecss[Name]
+			asset = ry.cachecss[filename]
 			ry.mu.RUnlock()
 		}
 		// Else construct the CSS asset from scratch
 		if asset == nil {
-			b, err := fs.ReadFile(ry.fs, Name)
+			fsys := ry.fs
+			if i := strings.IndexRune(filename, '?'); i > 0 {
+				query, _ := url.ParseQuery(filename[i+1:])
+				altfs := ry.altfs[query.Get("fs")]
+				if altfs != nil {
+					fsys = altfs
+				}
+			}
+			if name, err := url.QueryUnescape(filename); err != nil {
+				filename = name
+			}
+			b, err := fs.ReadFile(fsys, filename)
 			if err != nil {
 				return page, err
 			}
@@ -147,7 +170,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 			// Cache the CSS asset if the user enabled it
 			if ry.cacheenabled {
 				ry.mu.Lock()
-				ry.cachecss[Name] = asset
+				ry.cachecss[filename] = asset
 				ry.mu.Unlock()
 			}
 		}
@@ -158,17 +181,28 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		}
 	}
 	// Add the user-specified JS files to the page
-	for _, Name := range JS {
+	for _, filename := range JS {
 		var asset *Asset
 		// If JS asset is already cached for the given file name, use that asset
 		if ry.cacheenabled {
 			ry.mu.RLock()
-			asset = ry.cachejs[Name]
+			asset = ry.cachejs[filename]
 			ry.mu.RUnlock()
 		}
 		// Else construct the JS asset from scratch
 		if asset == nil {
-			b, err := fs.ReadFile(ry.fs, Name)
+			fsys := ry.fs
+			if i := strings.IndexRune(filename, '?'); i > 0 {
+				query, _ := url.ParseQuery(filename[i+1:])
+				altfs := ry.altfs[query.Get("fs")]
+				if altfs != nil {
+					fsys = altfs
+				}
+			}
+			if name, err := url.QueryUnescape(filename); err != nil {
+				filename = name
+			}
+			b, err := fs.ReadFile(fsys, filename)
 			if err != nil {
 				return page, err
 			}
@@ -179,7 +213,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 			// Cache the JS asset if the user enabled it
 			if ry.cacheenabled {
 				ry.mu.Lock()
-				ry.cachejs[Name] = asset
+				ry.cachejs[filename] = asset
 				ry.mu.Unlock()
 			}
 		}
@@ -388,6 +422,9 @@ func executeTemplate(t *template.Template, bufpool *bpool.BufferPool, w io.Write
 
 func categorize(names []string) (html, css, js []string) {
 	for _, name := range names {
+		if i := strings.IndexRune(name, '?'); i > 0 {
+			name = name[:i]
+		}
 		ext := strings.ToLower(filepath.Ext(name))
 		switch ext {
 		case ".css":

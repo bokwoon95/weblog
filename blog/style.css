@@ -1,0 +1,26 @@
+html {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Oxygen, Cantarell, sans-serif;
+}
+.hero-banner {
+  width: 100vw;
+  height: 400px;
+  background-image: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), url(https://source.unsplash.com/rnAsJ38qio8/1200x600);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: local;
+}
+.text-border {
+  text-shadow: -1px 0 black, 0 1px black, 1px 0 black, 0 -1px black;
+}
+.toolbar {
+  float: left;
+  width: 50vw;
+  position: fixed;
+  z-index: 1;
+  top: 10px;
+  left: 25%;
+  background-color: blue;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem 1rem 0.5rem 1rem;
+}

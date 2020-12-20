@@ -1,0 +1,8 @@
+.contenteditable-global {
+  border-style: dotted;
+  background-color: rgba(51, 170, 51, .4);
+}
+.contenteditable-local {
+  border-style: dotted;
+  background-color: rgba(240, 255, 0, 0.4);
+}
