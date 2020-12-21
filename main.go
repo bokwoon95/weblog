@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/bokwoon95/weblog/blog"
@@ -15,6 +16,7 @@ import (
 const port = ":80"
 
 func main() {
+	fmt.Println(os.Executable())
 	for {
 		pm, err := pagemanager.New("sqlite3", "./database.sqlite3")
 		if err != nil {

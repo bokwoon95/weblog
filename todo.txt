@@ -17,3 +17,33 @@ So instead it calls
 render.Page(w, r, data, "post-index.html?fs=templates", "style.css?fs=templates", "post-index.js?fs=templates")
 
 and renderly should search for those files accordingly in templatesFS. Also pagemanager/blog got the data = { summary = "true", some_other_setting = "lorem ipsum" }, it uses that to influence the decisions it makes when it comes to injecting the data into the template, like whether it should provide just the post {{ .Summary }} or the entire post {{ .Body }}.
+
+blg_kv:
+    post-index -> post-index.html?fs=builtin -> pass 'post-index.html' to
+    post-index -> post-index.html?fs=templates&dir=plainsimple
+
+pagemanager/pagemanager
+pagemanager/sqladmin
+pagemanager/blog
+pagemanager/rss
+pagemanager/present
+
+templates can be standalone or they can target specific pagemanager plugins.
+    the only difference between the two is whether it makes reference to a (yet to be injected) data pipeline
+Other than pm_kv strings, templates can also pm_kv array of objects (not sure how that will work yet)
+    pm_kv-ing an array of objects allows the user to define repeatable cards rather than just fixed ones
+a single filename is enough for pagemanager to find all the necessary html/css/js files to parse together with the main template
+    templatesFS implements a translation method that reads from config.toml:
+        ["post-index.html"]
+        html = ["header.html", "footer.html", "sidebar.html"]
+        css = ["style.css"]
+        js = ["post-index.js"]
+    layout templates are achieved with an optional 'main_html' key. If no main_html is provided, the provided filename will be used as the main template (as usual).
+        ["about-me.html"]
+        main_html = "layout.html"
+        html = ["layout.html", "header.html", "footer.html", "sidebar.html"]
+        css = ["style.css"]
+        js = ["post-index.js"]
+            ["about-me.html".args]
+            showbody = true
+            datefmt = "01/02/03" # or they could just call the datefmt method on the time.Time value
