@@ -47,3 +47,22 @@ a single filename is enough for pagemanager to find all the necessary html/css/j
             ["about-me.html".args]
             showbody = true
             datefmt = "01/02/03" # or they could just call the datefmt method on the time.Time value
+holy shit toml allows me to bundle markdown files as well, you can just define all your layout stuff in html and your content in markdown
+    ["my-blogge-post.md"]
+    url = "{{.YYYY}}/{{.MM}}/{{.PostTitle}}" # nah this is wayy too tedious, blog posts should belong under pm/blog. this is more for manually curated pages, like mdn docs
+    html = ["header.html", "footer.html", "sidebar.html"]
+    css = ["style.css"]
+    js = []
+    md = ["some-other-stuff.md"]
+    main_html = "layout.html"
+
+    # reference the content like this
+    <div class="post-body">
+        {{ index . "__content__" }}
+    </div>
+    # you can reference other included md snippets like this
+    <div class="footer">{{ index . "some-other-stuff.md" }}</div>
+
+    content-specific key values is defined in the content.md front matter
+    this means anytime pagemanager finds a content (.md) file, it will parse the front matter and inject that as part of the page data.
+    which means that it definitely has to start categorizing .md files as well
