@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
@@ -26,11 +27,12 @@ const (
 )
 
 type PageManager struct {
-	Restart    chan struct{}
-	DB         *sql.DB
-	Cache      *ristretto.Cache
-	Router     *chi.Mux
-	HTMLPolicy *bluemonday.Policy
+	Restart       chan struct{}
+	DB            *sql.DB
+	Cache         *ristretto.Cache
+	Router        *chi.Mux
+	HTMLPolicy    *bluemonday.Policy
+	RootDirectory string
 }
 
 func New(driverName, dataSourceName string) (*PageManager, error) {
@@ -90,6 +92,8 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	// HTMLPolicy
 	pm.HTMLPolicy = bluemonday.UGCPolicy()
 	pm.HTMLPolicy.AllowStyling()
+	// RootDirectory
+	pm.RootDirectory = "." + string(os.PathSeparator) + "pagemanager" + string(os.PathSeparator)
 	return pm, nil
 }
 

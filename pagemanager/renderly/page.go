@@ -450,10 +450,11 @@ func executeTemplate(t *template.Template, bufpool *bpool.BufferPool, w io.Write
 
 func categorize(names []string) (html, css, js []string) {
 	for _, name := range names {
+		truncatedName := name
 		if i := strings.IndexRune(name, '?'); i > 0 {
-			name = name[:i]
+			truncatedName = name[:i]
 		}
-		ext := strings.ToLower(filepath.Ext(name))
+		ext := strings.ToLower(filepath.Ext(truncatedName))
 		switch ext {
 		case ".css":
 			css = append(css, name)

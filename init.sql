@@ -5,7 +5,7 @@ DROP TRIGGER IF EXISTS blg_posts_after_update;
 DROP TABLE IF EXISTS blg_users_posts;
 DROP TABLE IF EXISTS blg_posts_fts;
 DROP TABLE IF EXISTS blg_posts;
-DROP TABLE IF EXISTS blg_config;
+DROP TABLE IF EXISTS blg_kv;
 -- pm
 DROP TABLE IF EXISTS pm_routes;
 DROP TABLE IF EXISTS pm_users;
@@ -30,14 +30,9 @@ CREATE TABLE pm_routes (
 );
 
 -- blog
-CREATE TABLE blg_config (
-    config_id INT NOT NULL PRIMARY KEY
-    ,json JSONB
-    ,pagination_format TEXT
-    ,posts_per_page INT
-    ,date_format TEXT
-    ,index_post_format TEXT
-    ,url_format TEXT
+CREATE TABLE blg_kv (
+    key TEXT NOT NULL PRIMARY KEY
+    ,value TEXT
 );
 
 CREATE TABLE blg_posts (
