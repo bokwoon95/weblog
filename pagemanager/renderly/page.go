@@ -468,7 +468,7 @@ func (ry *Renderly) ReadFile(filename string) ([]byte, error) {
 	}
 }
 
-// Open implements fs.FS, convert to a http.Filesystem using http.FS
+// Open implements fs.FS, which can be converted to a http.Filesystem using http.FS
 func (ry *Renderly) Open(name string) (fs.File, error) {
 	var fsys = ry.fs
 	var filename = name

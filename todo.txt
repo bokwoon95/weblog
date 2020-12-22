@@ -67,4 +67,42 @@ holy shit toml allows me to bundle markdown files as well, you can just define a
     this means anytime pagemanager finds a content (.md) file, it will parse the front matter and inject that as part of the page data.
     which means that it definitely has to start categorizing .md files as well
 
-each pagemanager/blog post can specify key value pairs as well in the spirit of url.Values. This key value data will be bundled with each post and template authors can explicitly query for it. This allows template authors to show various tags (such as 'short', or 'javascript') based on what key-values the user bundled in their post. This also serves as a flexible way that can express both tags and categories for a post.
+each pagemanager/blog post can specify key value pairs as well in the spirit of url.Values. This key value data will be bundled with each post and template authors can explicitly query for it. This allows template authors to show various tags (such as 'short', or 'javascript') based on what key-values the user bundled in their post. This is also a flexible way that can express both tags and categories for a post.
+
+type NullJSON struct {
+    Valid bool
+    JSON interface{}
+    Type int // 0 = Object, 1 = Array, 2 = Value
+}
+
+func pmkv(pageID, key, fallbackValue string) sql.NullString
+
+func pmjson(pageID, key, fallbackValye string) NullJSON
+
+{{ $title := pmkv .__pageID__ "title" `default text` }}
+<div class="contenteditable" data-kv="title">
+    {{ $title.String | html }}
+</div>
+
+{{ $sidebarItems := pmjson .__pageID__ "sidebarItems" `[
+    {
+        "title":"My Name",
+        "body":"mario waluigi smith"
+    },
+    {
+        "title":"my job",
+        "body":"professional retard"
+    }
+]`}}
+<div>
+    <div class="pmjson-ghostnode">
+        <div class="contenteditable" data-json="title">default text</div>
+        <div class="contenteditable" data-json="body">xxxx</div>
+    </div>
+    {{ range $sidebarItems.JSON }}
+    <div>
+        <div class="contenteditable" data-json="title">{{ .title | html }}</div>
+        <div class="contenteditable" data-json="body">{{ .body | html }}</div>
+    </div>
+    {{ end }}
+</div>

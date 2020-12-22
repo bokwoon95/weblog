@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bokwoon95/weblog/pagemanager/chi"
+	"github.com/go-chi/chi"
 )
 
 const start = `script-src-elem 'self' 'unsafe-inline' 'nonce-iKhbjLq7WUIq9DKSONPbAa6E_bxuIWskJYBY39RE6UU=' cdn.jsdelivr.net stackpath.bootstrapcdn.com cdn.datatables.net unpkg.com code.jquery.com ;` +

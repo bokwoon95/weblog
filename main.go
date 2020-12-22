@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/bokwoon95/weblog/blog"
 	"github.com/bokwoon95/weblog/pagemanager"
@@ -39,15 +37,6 @@ func main() {
 				log.Printf("srv.Shutdown error: %v\n", err)
 			}
 		}()
-		var count int
-		err = pm.DB.QueryRow("SELECT COUNT(*) FROM pm_routes").Scan(&count)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		fmt.Println("count:", count)
-		pm.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			io.WriteString(w, "restarted\nThere are "+strconv.Itoa(count)+" rows in pm_routes")
-		})
 		fmt.Println("Listening on localhost" + srv.Addr)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("srv.ListenAndServe error: %v\n", err)

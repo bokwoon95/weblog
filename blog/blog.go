@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/bokwoon95/weblog/pagemanager"
-	"github.com/bokwoon95/weblog/pagemanager/chi"
+	"github.com/go-chi/chi"
 	"github.com/bokwoon95/weblog/pagemanager/erro"
 	"github.com/bokwoon95/weblog/pagemanager/renderly"
 	"github.com/dgraph-io/ristretto"

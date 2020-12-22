@@ -11,10 +11,9 @@ import (
 	"strings"
 
 	sq "github.com/bokwoon95/go-structured-query/postgres"
-	"github.com/bokwoon95/weblog/pagemanager/chi"
-	"github.com/bokwoon95/weblog/pagemanager/chi/middleware"
-	"github.com/bokwoon95/weblog/pagemanager/docgen"
 	"github.com/dgraph-io/ristretto"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/microcosm-cc/bluemonday"
 )
@@ -79,7 +78,8 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	pm.Router.Use(pm.pm_routes)
 	pm.Router.Use(SecurityHeaders)
 	pm.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, docgen.JSONRoutesDoc(pm.Router))
+		chi.Walk(pm.Router, printroutes(w))
+		// io.WriteString(w, docgen.JSONRoutesDoc(pm.Router))
 	})
 	pm.Router.Get("/pm-admin", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Welcome to the pagemanager dashboard")
@@ -95,6 +95,14 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	// RootDirectory
 	pm.RootDirectory = "." + string(os.PathSeparator) + "pagemanager" + string(os.PathSeparator)
 	return pm, nil
+}
+
+type Route struct {
+	URL         string
+	Disabled    bool
+	RedirectURL string
+	HandlerURL  string
+	Content     string
 }
 
 // TODO: cache the sql.NullXXX variants

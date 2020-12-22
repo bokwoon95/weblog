@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bokwoon95/weblog/pagemanager/chi"
+	"github.com/go-chi/chi"
 	"github.com/bokwoon95/weblog/pagemanager/renderly"
 )
 
