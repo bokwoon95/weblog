@@ -8,6 +8,9 @@ blg_kv:
     post-index.html -> post-index.html?fs=templates&dir=plainsimple
     post.html -> post.html?fs=templates&dir=plainsimple
 
+post-index.html -> ~templates/plainsimple/post-index.html
+post.html -> ~templates/plainsimple/post.html
+
 note: pagemanager/blog was the one who registered the templates/ directory under as the 'templates' alt FS. so if it sets ?fs=templates, it's guaranteed that the templatesFS exists because it was the one that registered it
 
 anyway pagemanager/blog will look into the plainsimple/ directory (inside the templates/ directory) and find the config.toml. it feeds "post-index.html" as the key and gets back css = ["style.css"], js = ["post-index.js"], data = { summary = "true", some_other_setting = "lorem ipsum" }.

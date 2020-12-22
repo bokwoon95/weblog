@@ -28,9 +28,9 @@ const (
 type PageManager struct {
 	Restart       chan struct{}
 	DB            *sql.DB
-	Cache         *ristretto.Cache
+	cache         *ristretto.Cache
 	Router        *chi.Mux
-	HTMLPolicy    *bluemonday.Policy
+	htmlPolicy    *bluemonday.Policy
 	RootDirectory string
 }
 
@@ -63,7 +63,7 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 		return pm, fmt.Errorf("database ping failed: %w", err)
 	}
 	// Cache
-	pm.Cache, err = ristretto.NewCache(&ristretto.Config{
+	pm.cache, err = ristretto.NewCache(&ristretto.Config{
 		NumCounters: 1e7,     // number of keys to track frequency of (10M).
 		MaxCost:     1 << 30, // maximum cost of cache (1GB).
 		BufferItems: 64,      // number of keys per Get buffer.
@@ -90,57 +90,49 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	})
 	// HTMLPolicy
-	pm.HTMLPolicy = bluemonday.UGCPolicy()
-	pm.HTMLPolicy.AllowStyling()
+	pm.htmlPolicy = bluemonday.UGCPolicy()
+	pm.htmlPolicy.AllowStyling()
 	// RootDirectory
 	pm.RootDirectory = "." + string(os.PathSeparator) + "pagemanager" + string(os.PathSeparator)
 	return pm, nil
 }
 
-type Route struct {
-	URL         string
-	Disabled    bool
-	RedirectURL string
-	HandlerURL  string
-	Content     string
-}
-
 // TODO: cache the sql.NullXXX variants
 func (pm *PageManager) pm_routes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if value, ok := pm.Cache.Get(disabledKey + r.URL.Path); ok {
+		if value, ok := pm.cache.Get(disabledKey + r.URL.Path); ok {
 			if disabled, ok := value.(bool); ok {
 				if disabled {
 					pm.Router.NotFoundHandler().ServeHTTP(w, r)
 					return
 				}
 			} else {
-				pm.Cache.Del(disabledKey + r.URL.Path)
+				pm.cache.Del(disabledKey + r.URL.Path)
 			}
 		}
 		// page cached?
-		if value, ok := pm.Cache.Get(pageKey + r.URL.Path); ok {
+		if value, ok := pm.cache.Get(pageKey + r.URL.Path); ok {
 			if page, ok := value.(string); ok {
 				fmt.Println("serving page", r.URL, "from cache")
 				io.WriteString(w, page)
 				return
 			} else {
-				pm.Cache.Del(pageKey + r.URL.Path)
+				pm.cache.Del(pageKey + r.URL.Path)
 			}
 		}
 		// redirect_url cached?
-		if value, ok := pm.Cache.Get(redirectKey + r.URL.Path); ok {
+		if value, ok := pm.cache.Get(redirectKey + r.URL.Path); ok {
 			if redirectURL, ok := value.(string); ok {
 				if redirectURL != "" {
 					http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
 					return
 				}
 			} else {
-				pm.Cache.Del(redirectKey + r.URL.Path)
+				pm.cache.Del(redirectKey + r.URL.Path)
 			}
 		}
 		// handler_url cached?
-		if value, ok := pm.Cache.Get(handlerKey + r.URL.Path); ok {
+		if value, ok := pm.cache.Get(handlerKey + r.URL.Path); ok {
 			if handlerURL, ok := value.(string); ok {
 				rctx := chi.RouteContext(r.Context())
 				if pm.Router.Match(chi.NewRouteContext(), "GET", handlerURL) {
@@ -148,10 +140,10 @@ func (pm *PageManager) pm_routes(next http.Handler) http.Handler {
 					next.ServeHTTP(w, r)
 					return
 				} else {
-					pm.Cache.Del(handlerKey + r.URL.Path)
+					pm.cache.Del(handlerKey + r.URL.Path)
 				}
 			} else {
-				pm.Cache.Del(handlerKey + r.URL.Path)
+				pm.cache.Del(handlerKey + r.URL.Path)
 			}
 		}
 		var disabled sql.NullBool
@@ -168,17 +160,17 @@ func (pm *PageManager) pm_routes(next http.Handler) http.Handler {
 			return
 		}
 		if disabled.Bool {
-			pm.Cache.Set(disabledKey+r.URL.Path, disabled.Bool, 0)
+			pm.cache.Set(disabledKey+r.URL.Path, disabled.Bool, 0)
 			pm.Router.NotFoundHandler().ServeHTTP(w, r)
 			return
 		}
 		if page.String != "" {
-			pm.Cache.Set(pageKey+r.URL.Path, page.String, 0)
+			pm.cache.Set(pageKey+r.URL.Path, page.String, 0)
 			io.WriteString(w, page.String)
 			return
 		}
 		if redirectURL.String != "" {
-			pm.Cache.Set(handlerKey+r.URL.Path, redirectURL.String, 0)
+			pm.cache.Set(handlerKey+r.URL.Path, redirectURL.String, 0)
 			if redirectURL.String != "" {
 				http.Redirect(w, r, redirectURL.String, http.StatusMovedPermanently)
 				return
@@ -260,7 +252,7 @@ func (pm *PageManager) KVPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	for _, keyValuePair := range kvdata.KeyValuePairs {
-		pm.Cache.Set(keyValuePair.Key, keyValuePair.Value, 0)
+		pm.cache.Set(keyValuePair.Key, keyValuePair.Value, 0)
 	}
 	http.Redirect(w, r, kvdata.RedirectTo, http.StatusMovedPermanently)
 }

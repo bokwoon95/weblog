@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/bokwoon95/weblog/pagemanager"
-	"github.com/go-chi/chi"
 	"github.com/bokwoon95/weblog/pagemanager/erro"
 	"github.com/bokwoon95/weblog/pagemanager/renderly"
 	"github.com/dgraph-io/ristretto"
+	"github.com/go-chi/chi"
 )
 
 type Blog struct {
@@ -27,11 +27,10 @@ func New(namespace string) func(*pagemanager.PageManager) (pagemanager.Plugin, e
 		blg := &Blog{
 			PageManager: pm,
 		}
-		templatesDir := os.DirFS(pm.RootDirectory + "templates")
+		// templatesDir := os.DirFS(pm.RootDirectory + "templates")
 		blg.render, err = renderly.New(
-			templatesDir,
+			builtin,
 			renderly.GlobalCSS(builtin, "tachyons.css", "style.css"),
-			renderly.AltFS("builtin", builtin),
 		)
 		if err != nil {
 			return blg, erro.Wrap(err)
@@ -77,14 +76,14 @@ func (blg *Blog) kvSet(key, value string) error {
 func (blg *Blog) AddRoutes() error {
 	blg.Router.Route("/blog", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			err := blg.render.Page(w, r, nil, "blog.html?fs=builtin")
+			err := blg.render.Page(w, r, nil, "blog.html")
 			if err != nil {
 				blg.render.InternalServerError(w, r, err)
 				return
 			}
 		})
 		r.Get("/edit", func(w http.ResponseWriter, r *http.Request) {
-			err := blg.render.Page(w, r, nil, "blog.html?fs=builtin", "edit_mode.css?fs=builtin", "edit_mode.js?fs=builtin")
+			err := blg.render.Page(w, r, nil, "blog.html", "edit_mode.css", "edit_mode.js")
 			if err != nil {
 				blg.render.InternalServerError(w, r, err)
 				return
@@ -108,7 +107,7 @@ func (blg *Blog) postIndexFilenames() ([]string, error) {
 	if value.Valid {
 		templateName = value.String
 	} else {
-		templateName = "blog.html?fs=builtin" // default template
+		templateName = "blog.html" // default template
 	}
 	var filenames = resolve(templateName)
 	return filenames, nil

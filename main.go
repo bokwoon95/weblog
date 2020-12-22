@@ -9,6 +9,7 @@ import (
 
 	"github.com/bokwoon95/weblog/blog"
 	"github.com/bokwoon95/weblog/pagemanager"
+	"github.com/bokwoon95/weblog/pagemanager/renderly"
 )
 
 const port = ":80"
@@ -24,6 +25,16 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		tmp := os.DirFS(renderly.AbsDir("./blog"))
+		fmt.Println(tmp)
+		render, err := renderly.New(
+			os.DirFS(renderly.AbsDir(".")),
+			renderly.AltFS("blog", tmp),
+		)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		pm.Router.Handle("/static/*", http.StripPrefix("/static/", render.FileServer()))
 		defer func() { // only works for sqlite3
 			_, _ = pm.DB.Exec("PRAGMA optimize")
 		}()

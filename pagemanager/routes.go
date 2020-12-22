@@ -14,3 +14,11 @@ func printroutes(w io.Writer) func(string, string, http.Handler, ...func(http.Ha
 		return nil
 	}
 }
+
+type Route struct {
+	URL         string
+	Disabled    bool
+	RedirectURL string
+	HandlerURL  string
+	Content     string
+}

@@ -489,3 +489,7 @@ func (ry *Renderly) Open(name string) (fs.File, error) {
 	}
 	return fsys.Open(filename)
 }
+
+func (ry *Renderly) FileServer() http.Handler {
+	return http.FileServer(http.FS(ry))
+}
