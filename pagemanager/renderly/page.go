@@ -73,27 +73,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		}
 		// Else construct the template from scratch
 		if t == nil {
-			fsys := ry.fs
-			name := filename
-			i := strings.IndexRune(filename, '?')
-			if i > 0 {
-				name = filename[:i]
-				query, _ := url.ParseQuery(filename[i+1:])
-				fsName := query.Get("fs")
-				altfs := ry.altfs[fsName]
-				if fsName != "" && altfs != nil {
-					fsys = altfs
-				}
-			}
-			name, err := url.QueryUnescape(name)
-			if err != nil {
-				if i > 0 {
-					name = filename[:i]
-				} else {
-					name = filename
-				}
-			}
-			b, err := fs.ReadFile(fsys, name)
+			b, err := ry.ReadFile(filename)
 			if err != nil {
 				return page, err
 			}
@@ -116,7 +96,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 	}
 	page.html = page.html.Lookup(HTML[0])
 	if page.html == nil {
-		return page, erro.Wrap(fmt.Errorf(`no templated found for name "%s"`, HTML[0]))
+		return page, erro.Wrap(fmt.Errorf(`no template found for name "%s"`, HTML[0]))
 	}
 	// Find the list of dependency templates invoked by the first HTML template
 	depedencies, err := listAllDeps(page.html, HTML[0])
@@ -486,4 +466,74 @@ func addParseTree(parent, child *template.Template, childName string) error {
 		}
 	}
 	return nil
+}
+
+// TODO: marked for deletion
+func getFilename(input string) string {
+	i := strings.IndexRune(input, '?')
+	if i > 0 {
+		input = input[:i]
+	}
+	return input
+}
+
+func parseFilename(input string) (filename string, values url.Values) {
+	i := strings.IndexRune(input, '?')
+	if i > 0 {
+		filename = input[:i]
+		values, _ = url.ParseQuery(input[i+1:])
+	}
+	unescaped, err := url.QueryUnescape(filename)
+	if err == nil {
+		filename = unescaped
+	}
+	return filename, values
+}
+
+func (ry *Renderly) ReadFile(filename string) ([]byte, error) {
+	// ReadFile copied from function of the same name in
+	// $GOROOT/src/io/fs/readfile.go, with minor adjustments.
+	//
+	// Copyright 2020 The Go Authors. All rights reserved.
+	// Use of this source code is governed by a BSD-style
+	// license that can be found in the LICENSE file.
+	file, err := ry.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	var size int
+	if info, err := file.Stat(); err == nil {
+		size64 := info.Size()
+		if int64(int(size64)) == size64 {
+			size = int(size64)
+		}
+	}
+	data := make([]byte, 0, size+1)
+	for {
+		if len(data) >= cap(data) {
+			d := append(data[:cap(data)], 0)
+			data = d[:len(data)]
+		}
+		n, err := file.Read(data[len(data):cap(data)])
+		data = data[:len(data)+n]
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			return data, err
+		}
+	}
+}
+
+// Open implements fs.FS, convert to a http.Filesystem using http.FS
+func (ry *Renderly) Open(name string) (fs.File, error) {
+	fsys := ry.fs
+	filename, values := parseFilename(name)
+	fsName := values.Get("fs")
+	altfs := ry.altfs[fsName]
+	if altfs != nil && fsName != "" {
+		fsys = altfs
+	}
+	return fsys.Open(filename)
 }

@@ -66,3 +66,5 @@ holy shit toml allows me to bundle markdown files as well, you can just define a
     content-specific key values is defined in the content.md front matter
     this means anytime pagemanager finds a content (.md) file, it will parse the front matter and inject that as part of the page data.
     which means that it definitely has to start categorizing .md files as well
+
+each pagemanager/blog post can specify key value pairs as well in the spirit of url.Values. This key value data will be bundled with each post and template authors can explicitly query for it. This allows template authors to show various tags (such as 'short', or 'javascript') based on what key-values the user bundled in their post. This also serves as a flexible way that can express both tags and categories for a post.
