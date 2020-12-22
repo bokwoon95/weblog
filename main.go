@@ -49,17 +49,6 @@ func main() {
 			io.WriteString(w, "restarted\nThere are "+strconv.Itoa(count)+" rows in pm_routes")
 		})
 		fmt.Println("Listening on localhost" + srv.Addr)
-		// go func() {
-		// 	time.Sleep(100 * time.Millisecond)
-		// 	switch runtime.GOOS {
-		// 	case "windows":
-		// 		exec.Command("start", "http://localhost:80").Start()
-		// 	case "darwin":
-		// 		exec.Command("open", "http://localhost:80").Start()
-		// 	case "linux":
-		// 		exec.Command("xdg-open", "http://localhost:80").Start()
-		// 	}
-		// }()
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("srv.ListenAndServe error: %v\n", err)
 		}
