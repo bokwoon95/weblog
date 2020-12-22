@@ -1,6 +1,7 @@
 package pagemanager
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,9 +17,10 @@ func printroutes(w io.Writer) func(string, string, http.Handler, ...func(http.Ha
 }
 
 type Route struct {
-	URL         string
-	Disabled    bool
-	RedirectURL string
-	HandlerURL  string
-	Content     string
+	URL         sql.NullString
+	Disabled    sql.NullBool
+	RedirectURL sql.NullString
+	HandlerURL  sql.NullString
+	Content     sql.NullString
+	Page        sql.NullString
 }

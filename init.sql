@@ -24,9 +24,10 @@ CREATE TABLE pm_users (
 CREATE TABLE pm_routes (
     url TEXT NOT NULL PRIMARY KEY
     ,disabled BOOLEAN
-    ,page TEXT
     ,redirect_url TEXT
     ,handler_url TEXT
+    ,content TEXT
+    ,page TEXT
 );
 
 -- blog

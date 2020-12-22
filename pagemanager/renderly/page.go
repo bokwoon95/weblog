@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -395,9 +394,9 @@ func executeTemplate(t *template.Template, bufpool *bpool.BufferPool, w io.Write
 func categorize(names []string) (html, css, js []string) {
 	for _, name := range names {
 		truncatedName := name
-		if i := strings.IndexRune(name, '?'); i > 0 {
-			truncatedName = name[:i]
-		}
+		// if i := strings.IndexRune(name, '?'); i > 0 {
+		// 	truncatedName = name[:i]
+		// }
 		ext := strings.ToLower(filepath.Ext(truncatedName))
 		switch ext {
 		case ".css":
@@ -468,26 +467,37 @@ func (ry *Renderly) ReadFile(filename string) ([]byte, error) {
 	}
 }
 
+func (ry *Renderly) Resolve(name string) (fs.FS, string) {
+	var fsys = ry.fs
+	if name != "" && name[0] == '~' {
+		i := strings.IndexRune(name, '/')
+		if i > 0 {
+			fsName := name[1:i]
+			altfs := ry.altfs[fsName]
+			if altfs != nil {
+				fsys = altfs
+			}
+		}
+		name = name[i+1:]
+	}
+	return fsys, name
+}
+
 // Open implements fs.FS, which can be converted to a http.Filesystem using http.FS
 func (ry *Renderly) Open(name string) (fs.File, error) {
 	var fsys = ry.fs
-	var filename = name
-	var values url.Values
-	i := strings.IndexRune(name, '?')
-	if i > 0 {
-		filename = name[:i]
-		values, _ = url.ParseQuery(name[i+1:])
+	if name != "" && name[0] == '~' {
+		i := strings.IndexRune(name, '/')
+		if i > 0 {
+			fsName := name[1:i]
+			altfs := ry.altfs[fsName]
+			if altfs != nil {
+				fsys = altfs
+			}
+		}
+		name = name[i+1:]
 	}
-	unescaped, err := url.QueryUnescape(filename)
-	if err == nil {
-		filename = unescaped
-	}
-	fsName := values.Get("fs")
-	altfs := ry.altfs[fsName]
-	if altfs != nil && fsName != "" {
-		fsys = altfs
-	}
-	return fsys.Open(filename)
+	return fsys.Open(name)
 }
 
 func (ry *Renderly) FileServer() http.Handler {

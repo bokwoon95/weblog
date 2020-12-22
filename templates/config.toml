@@ -14,3 +14,13 @@ css = ["style.css"]
 js = []
     [pages.args]
     ich = "nee"
+
+["plainsimple/post-index.html"]
+html = []
+css = ["style.css"]
+js = ["post-index.js"]
+
+["plainsimple/post.html"]
+html = []
+css = ["style.css"]
+js = ["post.js"]

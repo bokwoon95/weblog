@@ -27,10 +27,11 @@ func New(namespace string) func(*pagemanager.PageManager) (pagemanager.Plugin, e
 		blg := &Blog{
 			PageManager: pm,
 		}
-		// templatesDir := os.DirFS(pm.RootDirectory + "templates")
+		templatesDir := os.DirFS("./templates/plainsimple")
 		blg.render, err = renderly.New(
 			builtin,
 			renderly.GlobalCSS(builtin, "tachyons.css", "style.css"),
+			renderly.AltFS("templates", templatesDir),
 		)
 		if err != nil {
 			return blg, erro.Wrap(err)

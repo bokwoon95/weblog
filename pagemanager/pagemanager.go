@@ -5,17 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	sq "github.com/bokwoon95/go-structured-query/postgres"
+	"github.com/bokwoon95/weblog/pagemanager/renderly"
 	"github.com/dgraph-io/ristretto"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/microcosm-cc/bluemonday"
+	"github.com/pelletier/go-toml"
 )
 
 const (
@@ -32,6 +36,7 @@ type PageManager struct {
 	Router        *chi.Mux
 	htmlPolicy    *bluemonday.Policy
 	RootDirectory string
+	Render        *renderly.Renderly
 }
 
 func New(driverName, dataSourceName string) (*PageManager, error) {
@@ -94,10 +99,23 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	pm.htmlPolicy.AllowStyling()
 	// RootDirectory
 	pm.RootDirectory = "." + string(os.PathSeparator) + "pagemanager" + string(os.PathSeparator)
+	// renderly
+	pm.Render, err = renderly.New(os.DirFS("./templates"))
+	if err != nil {
+		return pm, err
+	}
+	fsys, name := pm.Render.Resolve("plainsimple/post-index.html")
+	t, dir, err := locateconfig(fsys, name)
+	if err != nil {
+		return pm, err
+	}
+	key := strings.TrimPrefix("plainsimple/post-index.html", dir+string(os.PathSeparator))
+	// TODO: figure out how to get a subtree, I keep getting <nil> for some reason.
+	m := t.ToMap()
+	fmt.Println(m[key])
 	return pm, nil
 }
 
-// TODO: cache the sql.NullXXX variants
 func (pm *PageManager) pm_routes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if value, ok := pm.cache.Get(disabledKey + r.URL.Path); ok {
@@ -186,6 +204,115 @@ func (pm *PageManager) pm_routes(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (pm *PageManager) pm_routesv2(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, found := pm.cache.Get(r.URL.Path)
+		route, ok := data.(Route)
+		if !found || !ok {
+			query := "SELECT url, disabled, redirect_url, handler_url, content, page FROM pm_routes WHERE url = ?"
+			err := pm.DB.
+				QueryRow(query, r.URL.Path).
+				Scan(&route.URL, &route.Disabled, &route.RedirectURL, &route.HandlerURL, &route.Content, &route.Page)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			_ = pm.cache.Set(r.URL.Path, route, 0)
+		}
+		if route.Disabled.Valid && route.Disabled.Bool {
+			pm.Router.NotFoundHandler().ServeHTTP(w, r)
+			return
+		}
+		if route.RedirectURL.Valid {
+			http.Redirect(w, r, route.RedirectURL.String, http.StatusMovedPermanently)
+			return
+		}
+		if route.HandlerURL.Valid {
+			rctx := chi.RouteContext(r.Context())
+			rctx.RoutePath = route.HandlerURL.String
+			next.ServeHTTP(w, r)
+			return
+		}
+		if route.Content.Valid {
+			io.WriteString(w, route.Content.String)
+			return
+		}
+		if route.Page.Valid {
+			fsys, filename := pm.Render.Resolve(route.Page.String)
+			if fsys == nil {
+				http.Error(w, "can't locate fsys of "+route.Page.String, http.StatusInternalServerError)
+			}
+			_ = filename
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Locate config.toml
+func locateconfig(fsys fs.FS, filename string) (t *toml.Tree, dir string, err error) {
+	var currentDir, newDir, tomlpath string
+	currentDir = filename
+UP_DIR:
+	for {
+		newDir = filepath.Dir(currentDir)
+		if newDir == currentDir {
+			break
+		}
+		currentDir = newDir
+		f, err := fsys.Open(currentDir)
+		if err != nil {
+			return nil, currentDir, err
+		}
+		defer f.Close()
+		fdir, ok := f.(interface {
+			Readdirnames(n int) (names []string, err error)
+		})
+		if !ok {
+			return nil, currentDir, fmt.Errorf("can't read dir")
+		}
+		for {
+			names, err := fdir.Readdirnames(1)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					continue UP_DIR // no more files in current directory, go up one more directory
+				}
+				return nil, currentDir, err
+			}
+			if names[0] == "config.toml" {
+				if currentDir == "." {
+					tomlpath = "config.toml"
+				} else {
+					tomlpath = currentDir + string(os.PathSeparator) + "config.toml"
+				}
+				goto LOAD_TOML
+			}
+		}
+	}
+LOAD_TOML:
+	if tomlpath == "" {
+		return nil, currentDir, fmt.Errorf("no config.toml found")
+	}
+	b, err := fs.ReadFile(fsys, tomlpath)
+	if err != nil {
+		return nil, currentDir, err
+	}
+	t, err = toml.LoadBytes(b)
+	if err != nil {
+		return nil, currentDir, err
+	}
+	return t, currentDir, nil
+}
+
+type PageSource struct {
+	Name     string
+	HTML     []string
+	CSS      []string
+	JS       []string
+	MD       []string
+	MainHTML string
+	Args     map[string]interface{}
 }
 
 type Plugin interface {

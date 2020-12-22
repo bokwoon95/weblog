@@ -26,10 +26,11 @@ func main() {
 			log.Fatalln(err)
 		}
 		tmp := os.DirFS(renderly.AbsDir("./blog"))
-		fmt.Println(tmp)
+		templatesDir := os.DirFS("./templates/plainsimple")
 		render, err := renderly.New(
 			os.DirFS(renderly.AbsDir(".")),
 			renderly.AltFS("blog", tmp),
+			renderly.AltFS("templates", templatesDir),
 		)
 		if err != nil {
 			log.Fatalln(err)
