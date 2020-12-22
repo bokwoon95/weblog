@@ -50,6 +50,7 @@ type Posthook func(io.Writer, *http.Request) error
 
 func New(fsys fs.FS, opts ...Option) (*Renderly, error) {
 	ry := &Renderly{
+		mu:      &sync.RWMutex{},
 		fs:      fsys,
 		altfs:   make(map[string]fs.FS),
 		bufpool: bpool.NewBufferPool(64),

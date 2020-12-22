@@ -65,7 +65,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 	// Add user-specified HTML templates to the page template
 	for _, filename := range HTML {
 		var t *template.Template
-		// If the template is already cached for the given file Name, use that template
+		// If the template is already cached for the given filename, use that template
 		if ry.cacheenabled {
 			ry.mu.RLock()
 			t = ry.cachehtml[filename]
@@ -98,7 +98,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 	if page.html == nil {
 		return page, erro.Wrap(fmt.Errorf(`no template found for name "%s"`, HTML[0]))
 	}
-	// Find the list of dependency templates invoked by the first HTML template
+	// Find the list of dependency templates invoked by the main HTML template
 	depedencies, err := listAllDeps(page.html, HTML[0])
 	if err != nil {
 		return page, err
@@ -110,6 +110,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 	cssset := make(map[[32]byte]struct{})
 	jsset := make(map[[32]byte]struct{})
 	for _, templateName := range depedencies {
+		// css
 		for _, asset := range ry.css[templateName] {
 			if _, ok := cssset[asset.Hash]; ok {
 				continue
@@ -117,6 +118,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 			cssset[asset.Hash] = struct{}{}
 			page.css = append(page.css, asset)
 		}
+		// js
 		for _, asset := range ry.js[templateName] {
 			if _, ok := jsset[asset.Hash]; ok {
 				continue
@@ -124,7 +126,9 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 			jsset[asset.Hash] = struct{}{}
 			page.js = append(page.js, asset)
 		}
+		// prehooks
 		page.prehooks = append(page.prehooks, ry.prehooks[templateName]...)
+		// posthooks
 		page.posthooks = append(page.posthooks, ry.posthooks[templateName]...)
 	}
 	// Add the user-specified CSS files to the page
@@ -138,27 +142,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		}
 		// Else construct the CSS asset from scratch
 		if asset == nil {
-			fsys := ry.fs
-			name := filename
-			i := strings.IndexRune(filename, '?')
-			if i > 0 {
-				name = filename[:i]
-				query, _ := url.ParseQuery(filename[i+1:])
-				fsName := query.Get("fs")
-				altfs := ry.altfs[fsName]
-				if fsName != "" && altfs != nil {
-					fsys = altfs
-				}
-			}
-			name, err := url.QueryUnescape(name)
-			if err != nil {
-				if i > 0 {
-					name = filename[:i]
-				} else {
-					name = filename
-				}
-			}
-			b, err := fs.ReadFile(fsys, name)
+			b, err := ry.ReadFile(filename)
 			if err != nil {
 				return page, err
 			}
@@ -190,27 +174,7 @@ func (ry *Renderly) Lookup(filenames ...string) (Page, error) {
 		}
 		// Else construct the JS asset from scratch
 		if asset == nil {
-			fsys := ry.fs
-			name := filename
-			i := strings.IndexRune(filename, '?')
-			if i > 0 {
-				name = filename[:i]
-				query, _ := url.ParseQuery(filename[i+1:])
-				fsName := query.Get("fs")
-				altfs := ry.altfs[fsName]
-				if fsName != "" && altfs != nil {
-					fsys = altfs
-				}
-			}
-			name, err := url.QueryUnescape(name)
-			if err != nil {
-				if i > 0 {
-					name = filename[:i]
-				} else {
-					name = filename
-				}
-			}
-			b, err := fs.ReadFile(fsys, name)
+			b, err := ry.ReadFile(filename)
 			if err != nil {
 				return page, err
 			}
@@ -468,28 +432,6 @@ func addParseTree(parent, child *template.Template, childName string) error {
 	return nil
 }
 
-// TODO: marked for deletion
-func getFilename(input string) string {
-	i := strings.IndexRune(input, '?')
-	if i > 0 {
-		input = input[:i]
-	}
-	return input
-}
-
-func parseFilename(input string) (filename string, values url.Values) {
-	i := strings.IndexRune(input, '?')
-	if i > 0 {
-		filename = input[:i]
-		values, _ = url.ParseQuery(input[i+1:])
-	}
-	unescaped, err := url.QueryUnescape(filename)
-	if err == nil {
-		filename = unescaped
-	}
-	return filename, values
-}
-
 func (ry *Renderly) ReadFile(filename string) ([]byte, error) {
 	// ReadFile copied from function of the same name in
 	// $GOROOT/src/io/fs/readfile.go, with minor adjustments.
@@ -528,8 +470,18 @@ func (ry *Renderly) ReadFile(filename string) ([]byte, error) {
 
 // Open implements fs.FS, convert to a http.Filesystem using http.FS
 func (ry *Renderly) Open(name string) (fs.File, error) {
-	fsys := ry.fs
-	filename, values := parseFilename(name)
+	var fsys = ry.fs
+	var filename = name
+	var values url.Values
+	i := strings.IndexRune(name, '?')
+	if i > 0 {
+		filename = name[:i]
+		values, _ = url.ParseQuery(name[i+1:])
+	}
+	unescaped, err := url.QueryUnescape(filename)
+	if err == nil {
+		filename = unescaped
+	}
 	fsName := values.Get("fs")
 	altfs := ry.altfs[fsName]
 	if altfs != nil && fsName != "" {
