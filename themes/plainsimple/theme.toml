@@ -1,0 +1,19 @@
+author = "Chua Bok Woon"
+
+["post-index.html"]
+include = [
+    "header.html",
+    "style.css",
+    "post-index.js",
+]
+["post-index.html".args]
+summary = "true"
+
+["post.html"]
+include = [
+    "header.html",
+    "style.css",
+    "post.js",
+]
+["post.html".args]
+ich = "nee"

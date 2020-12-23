@@ -80,7 +80,8 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	// Router
 	pm.Router = chi.NewRouter()
 	pm.Router.Use(middleware.Recoverer)
-	pm.Router.Use(pm.pm_routes)
+	pm.Router.Use(middleware.Logger)
+	pm.Router.Use(pm.pm_routesv2)
 	pm.Router.Use(SecurityHeaders)
 	pm.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		chi.Walk(pm.Router, printroutes(w))
@@ -100,19 +101,11 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	// RootDirectory
 	pm.RootDirectory = "." + string(os.PathSeparator) + "pagemanager" + string(os.PathSeparator)
 	// renderly
-	pm.Render, err = renderly.New(os.DirFS("./templates"))
+	pm.Render, err = renderly.New(os.DirFS("./themes"))
+	// pm.Router.Handle("/static/*", http.StripPrefix("/static/", pm.Render.FileServer()))
 	if err != nil {
 		return pm, err
 	}
-	fsys, name := pm.Render.Resolve("plainsimple/post-index.html")
-	t, dir, err := locateconfig(fsys, name)
-	if err != nil {
-		return pm, err
-	}
-	key := strings.TrimPrefix("plainsimple/post-index.html", dir+string(os.PathSeparator))
-	// TODO: figure out how to get a subtree, I keep getting <nil> for some reason.
-	m := t.ToMap()
-	fmt.Println(m[key])
 	return pm, nil
 }
 
@@ -215,11 +208,11 @@ func (pm *PageManager) pm_routesv2(next http.Handler) http.Handler {
 			err := pm.DB.
 				QueryRow(query, r.URL.Path).
 				Scan(&route.URL, &route.Disabled, &route.RedirectURL, &route.HandlerURL, &route.Content, &route.Page)
-			if err != nil {
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			_ = pm.cache.Set(r.URL.Path, route, 0)
+			// _ = pm.cache.Set(r.URL.Path, route, 0)
 		}
 		if route.Disabled.Valid && route.Disabled.Bool {
 			pm.Router.NotFoundHandler().ServeHTTP(w, r)
@@ -244,75 +237,129 @@ func (pm *PageManager) pm_routesv2(next http.Handler) http.Handler {
 			if fsys == nil {
 				http.Error(w, "can't locate fsys of "+route.Page.String, http.StatusInternalServerError)
 			}
-			_ = filename
+			src, err := getPageSource(fsys, filename)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			var files []string
+			if src.MainTemplate != "" {
+				files = append(files, src.MainTemplate)
+			}
+			files = append(files, src.Name)
+			files = append(files, src.Include...)
+			err = pm.Render.Page(w, r, nil, files...)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-// Locate config.toml
-func locateconfig(fsys fs.FS, filename string) (t *toml.Tree, dir string, err error) {
-	var currentDir, newDir, tomlpath string
-	currentDir = filename
-UP_DIR:
-	for {
-		newDir = filepath.Dir(currentDir)
-		if newDir == currentDir {
-			break
-		}
-		currentDir = newDir
-		f, err := fsys.Open(currentDir)
-		if err != nil {
-			return nil, currentDir, err
-		}
-		defer f.Close()
-		fdir, ok := f.(interface {
-			Readdirnames(n int) (names []string, err error)
-		})
-		if !ok {
-			return nil, currentDir, fmt.Errorf("can't read dir")
-		}
-		for {
-			names, err := fdir.Readdirnames(1)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					continue UP_DIR // no more files in current directory, go up one more directory
-				}
-				return nil, currentDir, err
-			}
-			if names[0] == "config.toml" {
-				if currentDir == "." {
-					tomlpath = "config.toml"
-				} else {
-					tomlpath = currentDir + string(os.PathSeparator) + "config.toml"
-				}
-				goto LOAD_TOML
-			}
-		}
-	}
-LOAD_TOML:
-	if tomlpath == "" {
-		return nil, currentDir, fmt.Errorf("no config.toml found")
-	}
-	b, err := fs.ReadFile(fsys, tomlpath)
-	if err != nil {
-		return nil, currentDir, err
-	}
-	t, err = toml.LoadBytes(b)
-	if err != nil {
-		return nil, currentDir, err
-	}
-	return t, currentDir, nil
+type PageSource struct {
+	Name         string
+	MainTemplate string                 `toml:"main_template"`
+	Include      []string               `toml:"include"`
+	Args         map[string]interface{} `toml:"args"`
 }
 
-type PageSource struct {
-	Name     string
-	HTML     []string
-	CSS      []string
-	JS       []string
-	MD       []string
-	MainHTML string
-	Args     map[string]interface{}
+func getPageSource(fsys fs.FS, filename string) (PageSource, error) {
+	const configFilename = "theme.toml"
+	src := PageSource{
+		Name: filename,
+	}
+	currentPath := filename
+	var parentPath string
+	var configFound bool
+	for {
+		parentPath = filepath.Dir(currentPath)
+		if parentPath == currentPath {
+			break
+		}
+		currentPath = parentPath
+		err := func() error {
+			f, err := fsys.Open(currentPath)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			dir, ok := f.(interface {
+				Readdirnames(n int) (names []string, err error)
+			})
+			if !ok {
+				return fmt.Errorf("%s is not a directory", currentPath)
+			}
+			var names []string
+			for {
+				names, err = dir.Readdirnames(1)
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						return nil // no more files in current directory
+					}
+					return err
+				}
+				if names[0] == configFilename {
+					configFound = true
+					return nil
+				}
+			}
+		}()
+		if err != nil {
+			return src, err
+		}
+		if configFound {
+			break
+		}
+	}
+	if configFound {
+		var configDir string
+		if currentPath != "." {
+			configDir = currentPath + string(os.PathSeparator)
+		}
+		var mainTree *toml.Tree
+		b, err := fs.ReadFile(fsys, configDir+configFilename)
+		if err != nil {
+			return src, err
+		}
+		mainTree, err = toml.LoadBytes(b)
+		if err != nil {
+			return src, err
+		}
+		key := strings.TrimPrefix(filename, configDir)
+		subTree, _ := mainTree.GetPath([]string{key}).(*toml.Tree)
+		if subTree != nil {
+			err = subTree.Unmarshal(&src)
+			if err != nil {
+				return src, err
+			}
+			if src.MainTemplate != "" {
+				src.MainTemplate = configDir + src.MainTemplate
+			}
+			for i := range src.Include {
+				src.Include[i] = configDir + src.Include[i]
+			}
+			return src, nil
+		}
+	}
+	ext := filepath.Ext(filename)
+	if ext == filename {
+		ext = ""
+	}
+	basename := strings.TrimSuffix(filename, ext)
+	for _, name := range []string{basename + ".css", basename + ".js", basename + ".md"} {
+		f, err := fsys.Open(name)
+		if err == nil {
+			f.Close()
+			src.Include = append(src.Include, name)
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return src, err
+		}
+	}
+	return src, nil
 }
 
 type Plugin interface {

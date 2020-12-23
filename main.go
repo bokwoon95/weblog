@@ -6,16 +6,24 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/bokwoon95/weblog/blog"
 	"github.com/bokwoon95/weblog/pagemanager"
-	"github.com/bokwoon95/weblog/pagemanager/renderly"
 )
 
 const port = ":80"
 
 func main() {
-	fmt.Println(os.Executable())
+	a, err := os.Executable()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	b, err := filepath.EvalSymlinks(a)
+	if err != nil {
+		log.Fatalln()
+	}
+	fmt.Println(b)
 	for {
 		pm, err := pagemanager.New("sqlite3", "./database.sqlite3")
 		if err != nil {
@@ -25,17 +33,6 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		tmp := os.DirFS(renderly.AbsDir("./blog"))
-		templatesDir := os.DirFS("./templates/plainsimple")
-		render, err := renderly.New(
-			os.DirFS(renderly.AbsDir(".")),
-			renderly.AltFS("blog", tmp),
-			renderly.AltFS("templates", templatesDir),
-		)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		pm.Router.Handle("/static/*", http.StripPrefix("/static/", render.FileServer()))
 		defer func() { // only works for sqlite3
 			_, _ = pm.DB.Exec("PRAGMA optimize")
 		}()

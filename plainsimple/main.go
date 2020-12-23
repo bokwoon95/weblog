@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi"
 	"github.com/bokwoon95/weblog/pagemanager/renderly"
+	"github.com/go-chi/chi"
 )
 
 var (
