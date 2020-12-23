@@ -2,36 +2,33 @@
 DROP TRIGGER IF EXISTS blg_posts_after_insert;
 DROP TRIGGER IF EXISTS blg_posts_after_delete;
 DROP TRIGGER IF EXISTS blg_posts_after_update;
-DROP TABLE IF EXISTS blg_users_posts;
 DROP TABLE IF EXISTS blg_posts_fts;
 DROP TABLE IF EXISTS blg_posts;
-DROP TABLE IF EXISTS blg_kv;
+DROP TABLE IF EXISTS blg_config;
 -- pm
 DROP TABLE IF EXISTS pm_routes;
-DROP TABLE IF EXISTS pm_users;
-DROP TABLE IF EXISTS pm_kv;
+DROP TABLE IF EXISTS pm_templatedata;
 
 -- pagemanager
-CREATE TABLE pm_kv (
-    key TEXT NOT NULL PRIMARY KEY
-    ,value TEXT
-);
-
-CREATE TABLE pm_users (
-    user_id BIGINT NOT NULL PRIMARY KEY
-);
-
 CREATE TABLE pm_routes (
     url TEXT NOT NULL PRIMARY KEY
     ,disabled BOOLEAN
     ,redirect_url TEXT
     ,handler_url TEXT
     ,content TEXT
-    ,page TEXT
+    ,template TEXT
+);
+
+CREATE TABLE pm_templatedata (
+    pageid TEXT NOT NULL
+    ,name TEXT NOT NULL
+    ,value TEXT
+
+    ,UNIQUE(pageid, name)
 );
 
 -- blog
-CREATE TABLE blg_kv (
+CREATE TABLE blg_config (
     key TEXT NOT NULL PRIMARY KEY
     ,value TEXT
 );
@@ -88,11 +85,3 @@ BEGIN
         (NEW.id, NEW.title, NEW.summary, NEW.body)
     ;
 END;
-
-CREATE TABLE blg_users_posts (
-    user_id BIGINT
-    ,post_id BIGINT
-
-    ,FOREIGN KEY (user_id) REFERENCES pm_users (user_id)
-    ,FOREIGN KEY (post_id) REFERENCES blg_posts (post_id)
-);

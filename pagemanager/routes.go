@@ -22,5 +22,5 @@ type Route struct {
 	RedirectURL sql.NullString
 	HandlerURL  sql.NullString
 	Content     sql.NullString
-	Page        sql.NullString
+	Template    sql.NullString
 }

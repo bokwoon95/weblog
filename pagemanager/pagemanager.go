@@ -22,13 +22,6 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-const (
-	pageKey     = "pageKey\x00"
-	redirectKey = "redirectKey\x00"
-	handlerKey  = "handlerKey\x00"
-	disabledKey = "disabledKey\x00"
-)
-
 type PageManager struct {
 	Restart       chan struct{}
 	DB            *sql.DB
@@ -80,8 +73,7 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 	// Router
 	pm.Router = chi.NewRouter()
 	pm.Router.Use(middleware.Recoverer)
-	pm.Router.Use(middleware.Logger)
-	pm.Router.Use(pm.pm_routesv2)
+	pm.Router.Use(pm.pm_routes)
 	pm.Router.Use(SecurityHeaders)
 	pm.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		chi.Walk(pm.Router, printroutes(w))
@@ -111,103 +103,13 @@ func New(driverName, dataSourceName string) (*PageManager, error) {
 
 func (pm *PageManager) pm_routes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if value, ok := pm.cache.Get(disabledKey + r.URL.Path); ok {
-			if disabled, ok := value.(bool); ok {
-				if disabled {
-					pm.Router.NotFoundHandler().ServeHTTP(w, r)
-					return
-				}
-			} else {
-				pm.cache.Del(disabledKey + r.URL.Path)
-			}
-		}
-		// page cached?
-		if value, ok := pm.cache.Get(pageKey + r.URL.Path); ok {
-			if page, ok := value.(string); ok {
-				fmt.Println("serving page", r.URL, "from cache")
-				io.WriteString(w, page)
-				return
-			} else {
-				pm.cache.Del(pageKey + r.URL.Path)
-			}
-		}
-		// redirect_url cached?
-		if value, ok := pm.cache.Get(redirectKey + r.URL.Path); ok {
-			if redirectURL, ok := value.(string); ok {
-				if redirectURL != "" {
-					http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
-					return
-				}
-			} else {
-				pm.cache.Del(redirectKey + r.URL.Path)
-			}
-		}
-		// handler_url cached?
-		if value, ok := pm.cache.Get(handlerKey + r.URL.Path); ok {
-			if handlerURL, ok := value.(string); ok {
-				rctx := chi.RouteContext(r.Context())
-				if pm.Router.Match(chi.NewRouteContext(), "GET", handlerURL) {
-					rctx.RoutePath = handlerURL
-					next.ServeHTTP(w, r)
-					return
-				} else {
-					pm.cache.Del(handlerKey + r.URL.Path)
-				}
-			} else {
-				pm.cache.Del(handlerKey + r.URL.Path)
-			}
-		}
-		var disabled sql.NullBool
-		var page, redirectURL, handlerURL sql.NullString
-		err := pm.DB.
-			QueryRow("SELECT disabled, page, redirect_url, handler_url FROM pm_routes WHERE url = ?", r.URL.Path).
-			Scan(&disabled, &page, &redirectURL, &handlerURL)
-		if errors.Is(err, sql.ErrNoRows) {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if err != nil {
-			io.WriteString(w, err.Error())
-			return
-		}
-		if disabled.Bool {
-			pm.cache.Set(disabledKey+r.URL.Path, disabled.Bool, 0)
-			pm.Router.NotFoundHandler().ServeHTTP(w, r)
-			return
-		}
-		if page.String != "" {
-			pm.cache.Set(pageKey+r.URL.Path, page.String, 0)
-			io.WriteString(w, page.String)
-			return
-		}
-		if redirectURL.String != "" {
-			pm.cache.Set(handlerKey+r.URL.Path, redirectURL.String, 0)
-			if redirectURL.String != "" {
-				http.Redirect(w, r, redirectURL.String, http.StatusMovedPermanently)
-				return
-			}
-		}
-		if handlerURL.String != "" {
-			rctx := chi.RouteContext(r.Context())
-			if pm.Router.Match(chi.NewRouteContext(), "GET", handlerURL.String) {
-				rctx.RoutePath = handlerURL.String
-				next.ServeHTTP(w, r)
-				return
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (pm *PageManager) pm_routesv2(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, found := pm.cache.Get(r.URL.Path)
 		route, ok := data.(Route)
 		if !found || !ok {
-			query := "SELECT url, disabled, redirect_url, handler_url, content, page FROM pm_routes WHERE url = ?"
+			query := "SELECT url, disabled, redirect_url, handler_url, content, template FROM pm_routes WHERE url = ?"
 			err := pm.DB.
 				QueryRow(query, r.URL.Path).
-				Scan(&route.URL, &route.Disabled, &route.RedirectURL, &route.HandlerURL, &route.Content, &route.Page)
+				Scan(&route.URL, &route.Disabled, &route.RedirectURL, &route.HandlerURL, &route.Content, &route.Template)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -232,10 +134,10 @@ func (pm *PageManager) pm_routesv2(next http.Handler) http.Handler {
 			io.WriteString(w, route.Content.String)
 			return
 		}
-		if route.Page.Valid {
-			fsys, filename := pm.Render.Resolve(route.Page.String)
+		if route.Template.Valid {
+			fsys, filename := pm.Render.Resolve(route.Template.String)
 			if fsys == nil {
-				http.Error(w, "can't locate fsys of "+route.Page.String, http.StatusInternalServerError)
+				http.Error(w, "can't locate fsys of "+route.Template.String, http.StatusInternalServerError)
 			}
 			src, err := getPageSource(fsys, filename)
 			if err != nil {
